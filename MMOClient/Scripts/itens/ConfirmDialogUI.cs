@@ -3,10 +3,6 @@ using UnityEngine.UI;
 using TMPro;
 using System;
 
-/// <summary>
-/// Dialog de confirmação reutilizável
-/// Coloque em: mmoclient/Scripts/UI/ConfirmDialogUI.cs
-/// </summary>
 public class ConfirmDialogUI : MonoBehaviour
 {
     public static ConfirmDialogUI Instance { get; private set; }
@@ -46,9 +42,6 @@ public class ConfirmDialogUI : MonoBehaviour
         Hide();
     }
 
-    /// <summary>
-    /// Mostra dialog de confirmação
-    /// </summary>
     public void Show(string title, string message, Action onConfirm, Action onCancel = null, string confirmText = "Confirmar", string cancelText = "Cancelar")
     {
         if (dialogPanel == null)
@@ -75,9 +68,6 @@ public class ConfirmDialogUI : MonoBehaviour
         onCancelCallback = onCancel;
     }
 
-    /// <summary>
-    /// Esconde o dialog
-    /// </summary>
     public void Hide()
     {
         if (dialogPanel != null)
@@ -99,9 +89,6 @@ public class ConfirmDialogUI : MonoBehaviour
         Hide();
     }
 
-    /// <summary>
-    /// Atalho para confirmar drop de item
-    /// </summary>
     public void ShowDropConfirmation(string itemName, int quantity, Action onConfirm)
     {
         string message = quantity > 1 
@@ -110,4 +97,5 @@ public class ConfirmDialogUI : MonoBehaviour
 
         Show("⚠️ Confirmar Drop", message, onConfirm, null, "Dropar", "Cancelar");
     }
+
 }
