@@ -77,10 +77,7 @@ public class WorldManager : MonoBehaviour
             Invoke("Initialize", 0.5f);
         }
     }
-
-    /// <summary>
-    /// 🆕 Carrega prefab de monstro do Resources
-    /// </summary>
+	
     private GameObject LoadMonsterPrefab(string prefabPath)
     {
         // Verifica cache primeiro
@@ -202,8 +199,7 @@ public class WorldManager : MonoBehaviour
                 }
             }
         }
-
-        // 🆕 Spawn monstros com prefabs corretos
+		
         if (data.allMonsters != null)
         {
             Debug.Log($"👹 Spawning {data.allMonsters.Length} monsters");
@@ -461,10 +457,7 @@ public class WorldManager : MonoBehaviour
         Debug.Log($"✅ Spawned player: {characterName} at {position}");
         return playerObj;
     }
-
-    /// <summary>
-    /// 🆕 Spawna monstro usando prefab específico
-    /// </summary>
+	
     private void SpawnMonster(MonsterStateData data)
     {
         // 🆕 Carrega prefab correto
@@ -543,4 +536,5 @@ public class WorldManager : MonoBehaviour
     {
         return localCharacterData;
     }
+
 }
