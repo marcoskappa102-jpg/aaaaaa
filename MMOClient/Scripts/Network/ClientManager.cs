@@ -4,14 +4,6 @@ using System;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
-
-/// <summary>
-/// ✅ ClientManager MELHORADO
-/// - Reconexão automática
-/// - Configuration via ScriptableObject
-/// - Health checks
-/// - Melhor tratamento de erros
-/// </summary>
 public class ClientManager : MonoBehaviour
 {
     public static ClientManager Instance { get; private set; }
@@ -26,10 +18,6 @@ public class ClientManager : MonoBehaviour
     public event Action<string> OnMessageReceived;
     public event Action OnConnected;
     public event Action OnDisconnected;
-
-    // ===================================
-    // RECONEXÃO AUTOMÁTICA
-    // ===================================
     
     private bool isQuitting = false;
     private bool shouldReconnect = true;
@@ -73,10 +61,6 @@ public class ClientManager : MonoBehaviour
             Connect();
         }
     }
-
-    // ===================================
-    // CONEXÃO COM RETRY
-    // ===================================
 
     public async void Connect(string customUrl = null)
     {
@@ -146,10 +130,6 @@ public class ClientManager : MonoBehaviour
         }
     }
 
-    // ===================================
-    // RECONEXÃO AUTOMÁTICA
-    // ===================================
-
     private async void TryReconnect()
     {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS)
@@ -170,20 +150,6 @@ public class ClientManager : MonoBehaviour
         }
     }
 
-    // ===================================
-    // ENVIO DE MENSAGENS COM QUEUE
-    // ===================================
-
-    /// <summary>
-    /// Envia mensagem ao servidor
-    /// Usa 'new' para esconder método herdado do MonoBehaviour
-    /// </summary>
-// Adicione este método no ClientManager.cs
-// Substitua o método SendMessage existente por este:
-
-/// <summary>
-/// Envia mensagem ao servidor COM LOG para debug
-/// </summary>
 public new void SendMessage(string message)
 {
     // 🔍 DEBUG: Mostra o que está sendo enviado
@@ -256,10 +222,6 @@ public new void SendMessage(string message)
         }
     }
 
-    // ===================================
-    // HEALTH CHECK / PING
-    // ===================================
-
     private void Update()
     {
         #if !UNITY_WEBGL || UNITY_EDITOR
@@ -297,10 +259,6 @@ public new void SendMessage(string message)
 
         SendMessage(Newtonsoft.Json.JsonConvert.SerializeObject(pingMessage));
     }
-
-    // ===================================
-    // DESCONEXÃO LIMPA
-    // ===================================
 
     public void Disconnect()
     {
@@ -358,10 +316,6 @@ public new void SendMessage(string message)
         }
     }
 
-    // ===================================
-    // HELPERS
-    // ===================================
-
     public void SetPlayerId(string id)
     {
         PlayerId = id;
@@ -390,10 +344,6 @@ public new void SendMessage(string message)
     }
 }
 
-// ===================================
-// SCRIPTABLE OBJECT DE CONFIGURAÇÃO
-// ===================================
-
 [CreateAssetMenu(fileName = "NetworkConfig", menuName = "MMO/Network Config")]
 public class NetworkConfig : ScriptableObject
 {
@@ -418,4 +368,5 @@ public class NetworkConfig : ScriptableObject
         string protocol = useSSL ? "wss" : "ws";
         return $"{protocol}://{serverIP}:{serverPort}{serverPath}";
     }
+
 }
