@@ -1,10 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Helper para consultar altura do terreno no cliente
-/// Sincronizado com o servidor via heightmap
-/// Coloque em: mmoclient/Scripts/Utils/TerrainHelper.cs
-/// </summary>
 public class TerrainHelper : MonoBehaviour
 {
     public static TerrainHelper Instance { get; private set; }
@@ -52,10 +47,6 @@ public class TerrainHelper : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Obtém a altura EXATA do terreno na posição (worldX, worldZ)
-    /// Usa interpolação bilinear para suavidade
-    /// </summary>
     public float GetHeightAt(float worldX, float worldZ)
     {
         if (terrain == null || terrainData == null)
@@ -94,9 +85,6 @@ public class TerrainHelper : MonoBehaviour
         return finalHeight;
     }
 
-    /// <summary>
-    /// Ajusta uma posição para ficar no chão do terreno
-    /// </summary>
     public Vector3 ClampToGround(Vector3 position, float offset = -1f)
     {
         if (offset < 0)
@@ -106,9 +94,6 @@ public class TerrainHelper : MonoBehaviour
         return position;
     }
 
-    /// <summary>
-    /// Ajusta apenas o Y de uma posição existente
-    /// </summary>
     public void AdjustHeight(ref Vector3 position, float offset = -1f)
     {
         if (offset < 0)
@@ -117,9 +102,6 @@ public class TerrainHelper : MonoBehaviour
         position.y = GetHeightAt(position.x, position.z) + offset;
     }
 
-    /// <summary>
-    /// Verifica se uma posição está dentro dos limites do terreno
-    /// </summary>
     public bool IsInBounds(Vector3 position)
     {
         if (terrain == null)
@@ -132,9 +114,6 @@ public class TerrainHelper : MonoBehaviour
                position.z >= terrainPos.z && position.z <= terrainPos.z + terrainSize.z;
     }
 
-    /// <summary>
-    /// Raycast específico para terreno (usado em cliques de mouse)
-    /// </summary>
     public bool RaycastTerrain(Ray ray, out Vector3 hitPoint)
     {
         hitPoint = Vector3.zero;
@@ -175,10 +154,6 @@ public class TerrainHelper : MonoBehaviour
         return false;
     }
 
-    /// <summary>
-    /// Obtém a normal (direção "para cima") do terreno em uma posição
-    /// Útil para alinhar objetos com o terreno
-    /// </summary>
     public Vector3 GetNormalAt(float worldX, float worldZ)
     {
         if (terrain == null || terrainData == null)
@@ -198,10 +173,6 @@ public class TerrainHelper : MonoBehaviour
 
         return terrainData.GetInterpolatedNormal(normX, normZ);
     }
-
-    /// <summary>
-    /// Força recarregar o terreno (útil após troca de cena)
-    /// </summary>
     public void ReloadTerrain()
     {
         FindTerrain();
@@ -228,4 +199,5 @@ public class TerrainHelper : MonoBehaviour
         Gizmos.DrawLine(corner3, corner4);
         Gizmos.DrawLine(corner4, corner1);
     }
+
 }
