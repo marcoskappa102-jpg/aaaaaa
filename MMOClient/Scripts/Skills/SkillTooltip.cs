@@ -1,10 +1,6 @@
 using UnityEngine;
 using TMPro;
 
-/// <summary>
-/// Tooltip que aparece ao passar o mouse sobre uma skill
-/// Coloque em: MMOClient/Scripts/UI/Skills/SkillTooltip.cs
-/// </summary>
 public class SkillTooltip : MonoBehaviour
 {
     public static SkillTooltip Instance { get; private set; }
@@ -54,9 +50,6 @@ public class SkillTooltip : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Mostra tooltip com informações da skill
-    /// </summary>
     public void Show(LearnedSkillData skill, Transform slotTransform)
     {
         if (skill == null || skill.template == null)
@@ -94,9 +87,6 @@ public class SkillTooltip : MonoBehaviour
         UpdatePosition();
     }
 
-    /// <summary>
-    /// Esconde tooltip
-    /// </summary>
     public void Hide()
     {
         if (tooltipPanel != null)
@@ -107,9 +97,6 @@ public class SkillTooltip : MonoBehaviour
         isVisible = false;
     }
 
-    /// <summary>
-    /// Constrói texto com estatísticas da skill
-    /// </summary>
     private string BuildStatsText(LearnedSkillData skill)
     {
         var template = skill.template;
@@ -249,9 +236,6 @@ public class SkillTooltip : MonoBehaviour
         };
     }
 
-    /// <summary>
-    /// Atualiza posição do tooltip para seguir o mouse
-    /// </summary>
     private void UpdatePosition()
     {
         if (tooltipRect == null)
@@ -279,9 +263,6 @@ public class SkillTooltip : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Garante que tooltip não sai da tela
-    /// </summary>
     private void ClampToScreen()
     {
         if (canvas == null || tooltipRect == null)
@@ -313,4 +294,5 @@ public class SkillTooltip : MonoBehaviour
 
         tooltipRect.anchoredPosition += adjustment;
     }
+
 }
