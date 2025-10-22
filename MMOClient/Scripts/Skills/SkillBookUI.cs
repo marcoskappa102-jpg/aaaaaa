@@ -4,10 +4,6 @@ using TMPro;
 using System.Collections.Generic;
 using System.Linq;
 
-/// <summary>
-/// Interface para gerenciar skills (aprender e upar)
-/// VERSÃO CORRIGIDA - Usa SkillEntryUI
-/// </summary>
 public class SkillBookUI : MonoBehaviour
 {
     public static SkillBookUI Instance { get; private set; }
@@ -17,11 +13,11 @@ public class SkillBookUI : MonoBehaviour
     
     [Header("Learned Skills")]
     public Transform learnedSkillsContainer;
-    public GameObject learnedSkillEntryPrefab; // ✅ Agora com SkillEntryUI
+    public GameObject learnedSkillEntryPrefab; 
     
     [Header("Available Skills")]
     public Transform availableSkillsContainer;
-    public GameObject availableSkillEntryPrefab; // ✅ Agora com SkillEntryUI
+    public GameObject availableSkillEntryPrefab; 
     
     [Header("Info Panel")]
     public GameObject skillInfoPanel;
@@ -35,7 +31,7 @@ public class SkillBookUI : MonoBehaviour
     [Header("Slot Selection")]
     public GameObject slotSelectionPanel;
     public Transform slotButtonsContainer;
-    public GameObject slotButtonPrefab; // ✅ Prefab para botões de slot
+    public GameObject slotButtonPrefab;
     
     [Header("Status")]
     public TextMeshProUGUI statusPointsText;
@@ -160,10 +156,6 @@ private void RequestSkillData()
         Debug.LogError("❌ ClientManager.Instance is NULL!");
     }
 }
-
-    /// <summary>
-    /// ✅ CORRIGIDO - Usa SkillEntryUI
-    /// </summary>
 public void UpdateLearnedSkills(List<LearnedSkillData> skills)
 {
     Debug.Log($"📚 UpdateLearnedSkills called with {skills.Count} skills");
@@ -185,8 +177,6 @@ public void UpdateLearnedSkills(List<LearnedSkillData> skills)
     RefreshLearnedSkillsList();
     UpdateStatusPoints();
 }
-
-// 🆕 ADICIONAR ESTE MÉTODO TAMBÉM
 public void UpdateAvailableSkills(List<SkillTemplateData> skills)
 {
     Debug.Log($"📚 UpdateAvailableSkills called with {skills.Count} skills");
@@ -259,10 +249,6 @@ public void UpdateAvailableSkills(List<SkillTemplateData> skills)
             }
         }
     }
-
-    /// <summary>
-    /// ✅ CORRIGIDO - Handler unificado
-    /// </summary>
     private void OnSkillEntryClicked(SkillEntryUI entry)
     {
         // Deseleciona anterior
@@ -586,4 +572,5 @@ public void UpdateAvailableSkills(List<SkillTemplateData> skills)
             _ => type
         };
     }
+
 }
