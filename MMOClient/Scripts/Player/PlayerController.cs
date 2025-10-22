@@ -2,12 +2,6 @@ using UnityEngine;
 using Newtonsoft.Json;
 using TMPro;
 
-/// <summary>
-/// PlayerController - SISTEMA LINEAGE 2 CORRIGIDO
-/// 1º clique: Seleciona alvo (mostra painel)
-/// 2º clique: Inicia ataque automático
-/// Skills: Valida range, move até lá, usa skill
-/// </summary>
 public class PlayerController : MonoBehaviour
 {
     [Header("Movement Settings")]
@@ -226,20 +220,12 @@ private void HandleInput()
         }
     }
 }
-/// <summary>
-/// ✅ Verifica se está se movendo para usar skill
-/// </summary>
+
 private bool IsMovingForSkill()
 {
     return SkillManager.Instance != null && SkillManager.Instance.IsMovingToUseSkill();
 }
 
-
-    /// <summary>
-    /// ✅ CORRIGIDO - Sistema de clique em monstro
-    /// 1º clique: Seleciona (mostra painel mas NÃO some)
-    /// 2º clique rápido: Ataca
-    /// </summary>
     private void HandleMonsterClick(MonsterController monster)
     {
         float timeSinceLastClick = Time.time - lastClickTime;
@@ -262,9 +248,6 @@ private bool IsMovingForSkill()
         lastClickTime = Time.time;
     }
 
-    /// <summary>
-    /// ✅ CORRIGIDO - Apenas seleciona o alvo (não ataca, não some)
-    /// </summary>
     private void SelectTarget(MonsterController monster)
     {
         currentTarget = monster;
@@ -285,9 +268,6 @@ private bool IsMovingForSkill()
         Debug.Log($"🎯 Target selected: {monster.monsterName} (ID: {monster.monsterId}) - Panel stays visible");
     }
 
-    /// <summary>
-    /// ✅ CORRIGIDO - Inicia ataque automático
-    /// </summary>
     private void StartAutoAttack(MonsterController monster)
     {
         if (currentTarget != monster)
@@ -308,9 +288,6 @@ private bool IsMovingForSkill()
         Debug.Log($"⚔️ Started auto-attack on {monster.monsterName} (ID: {monster.monsterId})");
     }
 
-    /// <summary>
-    /// ✅ CORRIGIDO - Limpa target atual
-    /// </summary>
     public void ClearTarget()
     {
         currentTargetMonsterId = -1;
@@ -782,27 +759,19 @@ private bool IsMovingForSkill()
         wasInCombatLastFrame = false;
     }
 
-    /// <summary>
-    /// ✅ PÚBLICO - Para SkillManager saber se tem target
-    /// </summary>
     public bool HasTarget()
     {
         return currentTarget != null && currentTarget.isAlive;
     }
 
-    /// <summary>
-    /// ✅ PÚBLICO - Retorna target atual
-    /// </summary>
     public MonsterController GetCurrentTarget()
     {
         return currentTarget;
     }
 
-    /// <summary>
-    /// ✅ PÚBLICO - Retorna ID do target
-    /// </summary>
     public int GetCurrentTargetId()
     {
         return currentTargetMonsterId;
     }
+
 }
