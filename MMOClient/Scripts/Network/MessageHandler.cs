@@ -5,9 +5,6 @@ using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-/// <summary>
-/// ✅ MessageHandler COMPLETO - Trata TODOS os tipos de mensagem do servidor
-/// </summary>
 public class MessageHandler : MonoBehaviour
 {
     public static MessageHandler Instance { get; private set; }
@@ -638,9 +635,6 @@ private void HandleSkillLeveledUp(JObject json)
     }
 }
 
-/// <summary>
-/// 🆕 Handler para lista de skills disponíveis
-/// </summary>
 private void HandleSkillListResponse(JObject json)
 {
     try
@@ -700,9 +694,6 @@ private void HandleSkillListResponse(JObject json)
     }
 }
 
-/// <summary>
-/// Helper para parsear múltiplos níveis de skill
-/// </summary>
 private SkillLevelData[] ParseSkillLevels(JToken levelsJson)
 {
     if (levelsJson == null || !levelsJson.HasValues)
@@ -923,4 +914,5 @@ private SkillLevelData[] ParseSkillLevels(JToken levelsJson)
             ClientManager.Instance.OnMessageReceived -= HandleMessage;
         }
     }
+
 }
