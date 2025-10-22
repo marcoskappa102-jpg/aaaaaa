@@ -137,12 +137,6 @@ public class MonsterController : MonoBehaviour
         AdjustToTerrainHeight();
     }
 	
-	// <summary>
-/// Mostra/esconde highlight visual quando monstro é selecionado
-/// </summary>
-// <summary>
-/// 🆕 Encontra o player mais próximo
-/// </summary>
 private PlayerController FindNearestPlayer()
 {
     var players = GameObject.FindGameObjectsWithTag("Player");
@@ -297,4 +291,5 @@ public void UpdateFromServer(Vector3 position, int hp, bool alive, bool moving, 
             );
         }
     }
+
 }
