@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 
+/// <summary>
+/// ✅ CORRIGIDO - SkillManager com validações e cancelamento de skill
+/// </summary>
 public class SkillManager : MonoBehaviour
 {
     public static SkillManager Instance { get; private set; }
@@ -19,6 +22,13 @@ public class SkillManager : MonoBehaviour
     
     private int currentTargetMonsterId = -1;
     
+    // ✅ NOVO - Sistema de casttime
+    private bool isCasting = false;
+    private float castStartTime = 0f;
+    private int castingSkillId = 0;
+    private UseSkillRequest pendingSkillRequest;
+    
+    // Sistema de movimento para skill
     private bool movingToUseSkill = false;
     private int pendingSkillId = 0;
     private int pendingSlotNumber = 0;
@@ -26,7 +36,7 @@ public class SkillManager : MonoBehaviour
     private Vector3 targetPositionForSkill;
     private float skillRange = 0f;
     
-    private const float RANGE_BUFFER = 0.5f; // Para 0.5m antes do range máximo
+    private const float RANGE_BUFFER = 0.5f;
 
     private void Awake()
     {
@@ -48,10 +58,79 @@ public class SkillManager : MonoBehaviour
 
     private void Update()
     {
+        // ✅ NOVO - Processa casttime
+        if (isCasting)
+        {
+            UpdateCasting();
+        }
+        
         if (movingToUseSkill)
         {
             CheckSkillRangeAndUse();
         }
+    }
+
+    /// <summary>
+    /// ✅ NOVO - Sistema de casttime
+    /// </summary>
+    private void UpdateCasting()
+    {
+        if (!learnedSkills.TryGetValue(castingSkillId, out var skill))
+        {
+            CancelCasting();
+            return;
+        }
+
+        float elapsed = Time.time - castStartTime;
+        
+        if (elapsed >= skill.template.castTime)
+        {
+            // Cast completo - executa skill
+            ExecuteSkillAfterCast();
+            isCasting = false;
+        }
+    }
+
+    /// <summary>
+    /// ✅ NOVO - Cancela cast se mover ou target morrer
+    /// </summary>
+    public void CancelCasting()
+    {
+        if (isCasting)
+        {
+            Debug.Log($"❌ Cast cancelled: {castingSkillId}");
+            
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.AddCombatLog("<color=yellow>❌ Conjuração cancelada!</color>");
+            }
+            
+            isCasting = false;
+            castingSkillId = 0;
+            pendingSkillRequest = null;
+        }
+    }
+
+    private void ExecuteSkillAfterCast()
+    {
+        if (pendingSkillRequest == null)
+            return;
+
+        // Envia para servidor
+        var message = new
+        {
+            type = "useSkill",
+            skillId = pendingSkillRequest.skillId,
+            slotNumber = pendingSkillRequest.slotNumber,
+            targetId = pendingSkillRequest.targetId,
+            targetType = pendingSkillRequest.targetType,
+            targetPosition = pendingSkillRequest.targetPosition
+        };
+
+        string json = JsonConvert.SerializeObject(message);
+        ClientManager.Instance.SendMessage(json);
+        
+        pendingSkillRequest = null;
     }
 
     private void CreateSkillSlots()
@@ -157,8 +236,14 @@ public class SkillManager : MonoBehaviour
             pendingSkillId = 0;
             Debug.Log($"🎯 SkillManager: Cancelled skill movement");
         }
+        
+        // ✅ NOVO - Cancela cast também
+        CancelCasting();
     }
 
+    /// <summary>
+    /// ✅ CORRIGIDO - UseSkill com validações e casttime
+    /// </summary>
     public void UseSkill(int skillId, int slotNumber)
     {
         if (!learnedSkills.TryGetValue(skillId, out var skill))
@@ -172,30 +257,32 @@ public class SkillManager : MonoBehaviour
             Debug.LogWarning($"❌ Skill {skillId} has no template!");
             return;
         }
+
+        // ✅ NOVO - Não pode usar skill enquanto casta
+        if (isCasting)
+        {
+            Debug.Log("❌ Cannot use skill while casting!");
+            return;
+        }
+
         if (skill.template.targetType == "enemy")
         {
             if (currentTargetMonsterId <= 0)
             {
-                Debug.Log("❌ Nenhum alvo selecionado!");
+                Debug.Log("❌ No target selected!");
                 
                 if (UIManager.Instance != null)
                 {
-                    UIManager.Instance.AddCombatLog("<color=yellow>❌ Selecione um alvo primeiro!</color>");
+                    UIManager.Instance.AddCombatLog("<color=yellow>❌ Selecione um alvo!</color>");
                 }
                 return;
             }
 
-            var monsterObj = GameObject.Find($"Monster_{currentTargetMonsterId}") ?? 
-                            FindMonsterByIdInScene(currentTargetMonsterId);
+            var monsterObj = FindMonsterByIdInScene(currentTargetMonsterId);
             
             if (monsterObj == null)
             {
-                Debug.LogWarning($"❌ Monster {currentTargetMonsterId} not found in scene!");
-                
-                if (UIManager.Instance != null)
-                {
-                    UIManager.Instance.AddCombatLog("<color=yellow>❌ Alvo não encontrado!</color>");
-                }
+                Debug.LogWarning($"❌ Monster {currentTargetMonsterId} not found!");
                 return;
             }
 
@@ -203,12 +290,7 @@ public class SkillManager : MonoBehaviour
             
             if (monsterController == null || !monsterController.isAlive)
             {
-                Debug.LogWarning($"❌ Monster {currentTargetMonsterId} is dead or invalid!");
-                
-                if (UIManager.Instance != null)
-                {
-                    UIManager.Instance.AddCombatLog("<color=yellow>❌ Alvo inválido!</color>");
-                }
+                Debug.LogWarning($"❌ Monster {currentTargetMonsterId} is dead!");
                 return;
             }
 
@@ -223,43 +305,66 @@ public class SkillManager : MonoBehaviour
             float distance = Vector3.Distance(player.transform.position, monsterObj.transform.position);
             float range = skill.template.range;
 
-            Debug.Log($"📏 Distance to target: {distance:F2}m, Skill range: {range:F2}m");
-            float effectiveRange = range - RANGE_BUFFER;
-
             if (distance > range)
             {
-                Debug.Log($"🏃 Too far! Moving to range first...");
+                Debug.Log($"🏃 Too far! Moving to range...");
                 
                 movingToUseSkill = true;
                 pendingSkillId = skillId;
                 pendingSlotNumber = slotNumber;
                 pendingTargetId = currentTargetMonsterId.ToString();
                 targetPositionForSkill = monsterObj.transform.position;
-                skillRange = effectiveRange;
+                skillRange = range - RANGE_BUFFER;
                 
-                SendMoveToSkillRange(player.transform.position, monsterObj.transform.position, effectiveRange);
-                
-                if (UIManager.Instance != null)
-                {
-                    UIManager.Instance.AddCombatLog($"<color=cyan>🏃 Aproximando do alvo...</color>");
-                }
-                
+                SendMoveToSkillRange(player.transform.position, monsterObj.transform.position, skillRange);
                 return;
             }
         }
 
-        ExecuteSkill(skillId, slotNumber, skill.template);
+        // ✅ NOVO - Se tem casttime, inicia cast
+        if (skill.template.castTime > 0)
+        {
+            StartCasting(skillId, slotNumber, skill.template);
+        }
+        else
+        {
+            // Instant cast
+            ExecuteSkill(skillId, slotNumber, skill.template);
+        }
+    }
+
+    /// <summary>
+    /// ✅ NOVO - Inicia casting
+    /// </summary>
+    private void StartCasting(int skillId, int slotNumber, SkillTemplateData template)
+    {
+        isCasting = true;
+        castingSkillId = skillId;
+        castStartTime = Time.time;
+        
+        // Prepara request
+        pendingSkillRequest = new UseSkillRequest
+        {
+            skillId = skillId,
+            slotNumber = slotNumber,
+            targetId = currentTargetMonsterId > 0 ? currentTargetMonsterId.ToString() : null,
+            targetType = template.targetType == "enemy" ? "monster" : "player",
+            targetPosition = null
+        };
+        
+        Debug.Log($"⏳ Casting {template.name} ({template.castTime}s)...");
+        
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.AddCombatLog($"<color=cyan>⏳ Conjurando {template.name}...</color>");
+        }
     }
 
     private void SendMoveToSkillRange(Vector3 playerPos, Vector3 monsterPos, float range)
     {
-        // Calcula direção player -> monstro
         Vector3 direction = (monsterPos - playerPos).normalized;
-        
-        // Calcula ponto NO RANGE (não no monstro)
         Vector3 targetPos = monsterPos - (direction * range);
         
-        // Ajusta ao terreno
         if (TerrainHelper.Instance != null)
         {
             targetPos = TerrainHelper.Instance.ClampToGround(targetPos, 0f);
@@ -278,8 +383,6 @@ public class SkillManager : MonoBehaviour
 
         string json = JsonConvert.SerializeObject(message);
         ClientManager.Instance.SendMessage(json);
-        
-        Debug.Log($"🏃 Moving to skill range position: ({targetPos.x:F1}, {targetPos.z:F1})");
     }
 
     private void CheckSkillRangeAndUse()
@@ -296,10 +399,10 @@ public class SkillManager : MonoBehaviour
         
         if (!string.IsNullOrEmpty(pendingTargetId))
         {
-            monsterObj = GameObject.Find($"Monster_{pendingTargetId}") ?? 
-                        FindMonsterByIdInScene(int.Parse(pendingTargetId));
+            monsterObj = FindMonsterByIdInScene(int.Parse(pendingTargetId));
         }
         
+        // ✅ CORRIGIDO - Verifica se target ainda existe e está vivo
         if (monsterObj == null)
         {
             Debug.LogWarning($"❌ Target lost! Cancelling skill {pendingSkillId}");
@@ -308,9 +411,19 @@ public class SkillManager : MonoBehaviour
             pendingTargetId = null;
             return;
         }
+
+        var monsterController = monsterObj.GetComponent<MonsterController>();
+        if (monsterController == null || !monsterController.isAlive)
+        {
+            Debug.LogWarning($"❌ Target died! Cancelling skill");
+            movingToUseSkill = false;
+            pendingSkillId = 0;
+            pendingTargetId = null;
+            return;
+        }
+        
         float distance = Vector3.Distance(player.transform.position, monsterObj.transform.position);
 
-        // Chegou no range? (com buffer de segurança)
         if (distance <= skillRange + 0.2f)
         {
             Debug.Log($"✅ Reached skill range! Using skill {pendingSkillId}");
@@ -330,7 +443,6 @@ public class SkillManager : MonoBehaviour
             pendingSkillId = 0;
             pendingTargetId = null;
         }
-        // Se ficou muito longe (alvo se moveu muito), recalcula
         else if (distance > skillRange + 3f)
         {
             Debug.Log($"⚠️ Target moved too far, recalculating path...");
@@ -340,7 +452,6 @@ public class SkillManager : MonoBehaviour
 
     private void ExecuteSkill(int skillId, int slotNumber, SkillTemplateData template)
     {
-        // Determina target baseado no tipo de skill
         string targetId = null;
         Vector3? targetPosition = null;
 
@@ -370,7 +481,6 @@ public class SkillManager : MonoBehaviour
                 break;
         }
 
-        // Monta mensagem
         var message = new
         {
             type = "useSkill",
@@ -478,5 +588,17 @@ public class SkillManager : MonoBehaviour
             MessageHandler.Instance.OnSelectCharacterResponse -= HandleCharacterSelected;
         }
     }
+}
 
+/// <summary>
+/// ✅ NOVO - Request de skill com validação
+/// </summary>
+[System.Serializable]
+public class UseSkillRequest
+{
+    public int skillId;
+    public int slotNumber;
+    public string targetId;
+    public string targetType;
+    public Vector3? targetPosition;
 }
