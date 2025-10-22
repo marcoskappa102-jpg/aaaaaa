@@ -18,8 +18,7 @@ public class SkillManager : MonoBehaviour
     private Dictionary<int, LearnedSkillData> learnedSkills = new Dictionary<int, LearnedSkillData>();
     
     private int currentTargetMonsterId = -1;
-
-    // ✅ CORREÇÃO: Controle de movimento para skill COM RANGE CORRETO
+    
     private bool movingToUseSkill = false;
     private int pendingSkillId = 0;
     private int pendingSlotNumber = 0;
@@ -27,7 +26,6 @@ public class SkillManager : MonoBehaviour
     private Vector3 targetPositionForSkill;
     private float skillRange = 0f;
     
-    // ✅ NOVO: Distância mínima segura para parar ANTES do alvo
     private const float RANGE_BUFFER = 0.5f; // Para 0.5m antes do range máximo
 
     private void Awake()
@@ -50,7 +48,6 @@ public class SkillManager : MonoBehaviour
 
     private void Update()
     {
-        // ✅ Verifica se chegou no range para usar skill
         if (movingToUseSkill)
         {
             CheckSkillRangeAndUse();
@@ -154,7 +151,6 @@ public class SkillManager : MonoBehaviour
     {
         currentTargetMonsterId = -1;
         
-        // ✅ CORREÇÃO: Só cancela movimento se estava indo usar skill
         if (movingToUseSkill)
         {
             movingToUseSkill = false;
@@ -176,8 +172,6 @@ public class SkillManager : MonoBehaviour
             Debug.LogWarning($"❌ Skill {skillId} has no template!");
             return;
         }
-
-        // ✅ VALIDAÇÃO: Verifica se precisa de target
         if (skill.template.targetType == "enemy")
         {
             if (currentTargetMonsterId <= 0)
@@ -230,8 +224,6 @@ public class SkillManager : MonoBehaviour
             float range = skill.template.range;
 
             Debug.Log($"📏 Distance to target: {distance:F2}m, Skill range: {range:F2}m");
-
-            // ✅ CORREÇÃO: Usa buffer para parar ANTES do range máximo
             float effectiveRange = range - RANGE_BUFFER;
 
             if (distance > range)
@@ -243,9 +235,8 @@ public class SkillManager : MonoBehaviour
                 pendingSlotNumber = slotNumber;
                 pendingTargetId = currentTargetMonsterId.ToString();
                 targetPositionForSkill = monsterObj.transform.position;
-                skillRange = effectiveRange; // ✅ USA RANGE COM BUFFER
+                skillRange = effectiveRange;
                 
-                // ✅ CORREÇÃO: Move para UMA POSIÇÃO NO RANGE, não para o alvo
                 SendMoveToSkillRange(player.transform.position, monsterObj.transform.position, effectiveRange);
                 
                 if (UIManager.Instance != null)
@@ -257,13 +248,9 @@ public class SkillManager : MonoBehaviour
             }
         }
 
-        // ✅ ESTÁ NO RANGE - USA A SKILL (mas NÃO inicia cooldown visual aqui)
         ExecuteSkill(skillId, slotNumber, skill.template);
     }
 
-    /// <summary>
-    /// ✅ CORRIGIDO: Calcula posição DENTRO DO RANGE (não na posição exata do alvo)
-    /// </summary>
     private void SendMoveToSkillRange(Vector3 playerPos, Vector3 monsterPos, float range)
     {
         // Calcula direção player -> monstro
@@ -295,9 +282,6 @@ public class SkillManager : MonoBehaviour
         Debug.Log($"🏃 Moving to skill range position: ({targetPos.x:F1}, {targetPos.z:F1})");
     }
 
-    /// <summary>
-    /// ✅ CORRIGIDO: Verifica range continuamente e usa skill quando chega
-    /// </summary>
     private void CheckSkillRangeAndUse()
     {
         var player = GameObject.FindGameObjectWithTag("Player");
@@ -308,7 +292,6 @@ public class SkillManager : MonoBehaviour
             return;
         }
 
-        // ✅ Busca o alvo NOVAMENTE (pode ter se movido)
         GameObject monsterObj = null;
         
         if (!string.IsNullOrEmpty(pendingTargetId))
@@ -325,8 +308,6 @@ public class SkillManager : MonoBehaviour
             pendingTargetId = null;
             return;
         }
-
-        // ✅ CORREÇÃO: Não atualiza posição do alvo constantemente (causa "grudamento")
         float distance = Vector3.Distance(player.transform.position, monsterObj.transform.position);
 
         // Chegou no range? (com buffer de segurança)
@@ -338,7 +319,6 @@ public class SkillManager : MonoBehaviour
             {
                 ExecuteSkill(pendingSkillId, pendingSlotNumber, skill.template);
                 
-                // ✅ CORREÇÃO: SÓ AGORA inicia o cooldown visual
                 var slot = skillSlots.FirstOrDefault(s => s.slotNumber == pendingSlotNumber);
                 if (slot != null)
                 {
@@ -358,9 +338,6 @@ public class SkillManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// ✅ CORRIGIDO: Executa a skill (envia para servidor) SEM iniciar cooldown aqui
-    /// </summary>
     private void ExecuteSkill(int skillId, int slotNumber, SkillTemplateData template)
     {
         // Determina target baseado no tipo de skill
@@ -415,9 +392,6 @@ public class SkillManager : MonoBehaviour
         Debug.Log($"⚔️ Using skill: {template.name} (Level {learnedSkills[skillId].currentLevel})");
     }
 
-    /// <summary>
-    /// ✅ HELPER - Busca monstro por ID na cena
-    /// </summary>
     private GameObject FindMonsterByIdInScene(int monsterId)
     {
         var monsters = GameObject.FindGameObjectsWithTag("Monster");
@@ -435,9 +409,6 @@ public class SkillManager : MonoBehaviour
         return null;
     }
 
-    /// <summary>
-    /// ✅ Verifica se está se movendo para usar skill
-    /// </summary>
     public bool IsMovingToUseSkill()
     {
         return movingToUseSkill;
@@ -507,4 +478,5 @@ public class SkillManager : MonoBehaviour
             MessageHandler.Instance.OnSelectCharacterResponse -= HandleCharacterSelected;
         }
     }
+
 }
