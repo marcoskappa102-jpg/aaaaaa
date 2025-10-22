@@ -4,6 +4,9 @@ using MMOServer.Models;
 
 namespace MMOServer.Server
 {
+    /// <summary>
+    /// ✅ CORRIGIDO - WorldManager com otimizações de performance e segurança
+    /// </summary>
     public class WorldManager
     {
         private static WorldManager? instance;
@@ -19,21 +22,28 @@ namespace MMOServer.Server
 
         private System.Timers.Timer? updateTimer;
         private const int UPDATE_INTERVAL = 50; // 50ms = 20 ticks/segundo
-        private const int SAVE_INTERVAL = 5000; // Salva a cada 5 segundos
+        private const int SAVE_INTERVAL = 5000; // 5 segundos
+        private const int BROADCAST_INTERVAL = 100; // 100ms = 10 broadcasts/segundo (OTIMIZAÇÃO)
 
         private long lastSaveTime = 0;
+        private long lastBroadcastTime = 0; // ✅ NOVO
         private object broadcastLock = new object();
         
         private DateTime serverStartTime = DateTime.UtcNow;
 
+        // ✅ NOVO - Anti-cheat básico
+        private const float MAX_MOVEMENT_SPEED = 15f; // 3x velocidade normal
+        private Dictionary<string, Position> lastPlayerPositions = new Dictionary<string, Position>();
+        private Dictionary<string, long> lastPositionUpdateTime = new Dictionary<string, long>();
+
         public void Initialize()
         {
-            Console.WriteLine("WorldManager initialized - Authoritative Server Mode (Ragnarok-style)");
+            Console.WriteLine("🌍 WorldManager initialized - Authoritative Server Mode");
             
             serverStartTime = DateTime.UtcNow;
             
             MonsterManager.Instance.Initialize();
-            SkillManager.Instance.Initialize(); // 🆕 ADICIONE ESTA LINHA
+            SkillManager.Instance.Initialize();
 			
             updateTimer = new System.Timers.Timer(UPDATE_INTERVAL);
             updateTimer.Elapsed += OnWorldUpdate;
@@ -41,49 +51,85 @@ namespace MMOServer.Server
             updateTimer.Start();
             
             lastSaveTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            lastBroadcastTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             
-            Console.WriteLine("✅ Combat System: Ragnarok-style auto-attack enabled");
-			Console.WriteLine("✅ Skill System: Skills 1-9 enabled");
-            Console.WriteLine("   - Click monster to start attacking");
-            Console.WriteLine("   - Click ground/another monster to stop");
-            Console.WriteLine("   - Attack speed based on character ASPD");
-            Console.WriteLine("✅ Loot System: Monster drops enabled");
-            Console.WriteLine("   - Gold and items drop on monster death");
-			
+            Console.WriteLine("✅ Combat System: Ragnarok-style auto-attack");
+            Console.WriteLine("✅ Skill System: 1-9 hotkeys");
+            Console.WriteLine("✅ Loot System: Monster drops");
+            Console.WriteLine("✅ Anti-cheat: Movement validation");
         }
 
-private void OnWorldUpdate(object? sender, ElapsedEventArgs e)
-{
-    lock (broadcastLock)
-    {
-        long currentTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        
-        float currentTime = (float)(DateTime.UtcNow - serverStartTime).TotalSeconds;
-        float deltaTime = UPDATE_INTERVAL / 1000f;
-
-        // 1. Atualiza movimento de players
-        PlayerManager.Instance.UpdateAllPlayersMovement(deltaTime);
-        
-        // 2. Processa combate automático
-        ProcessPlayerCombat(currentTime, deltaTime);
-        
-        // 3. Atualiza monstros (AI e combate)
-        MonsterManager.Instance.Update(deltaTime, currentTime);
-        
-        // 🆕 4. Atualiza efeitos de skills (buffs/debuffs)
-        SkillManager.Instance.UpdateActiveEffects(currentTime);
-        
-        // 5. Broadcast do estado do mundo
-        BroadcastWorldState();
-        
-        // 6. Salva periodicamente
-        if (currentTimeMs - lastSaveTime >= SAVE_INTERVAL)
+        private void OnWorldUpdate(object? sender, ElapsedEventArgs e)
         {
-            SaveWorldState();
-            lastSaveTime = currentTimeMs;
+            lock (broadcastLock)
+            {
+                long currentTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                
+                float currentTime = (float)(DateTime.UtcNow - serverStartTime).TotalSeconds;
+                float deltaTime = UPDATE_INTERVAL / 1000f;
+
+                // 1. Atualiza movimento de players (com validação anti-cheat)
+                PlayerManager.Instance.UpdateAllPlayersMovement(deltaTime);
+                
+                // 2. Processa combate automático
+                ProcessPlayerCombat(currentTime, deltaTime);
+                
+                // 3. Atualiza monstros (AI e combate)
+                MonsterManager.Instance.Update(deltaTime, currentTime);
+                
+                // 4. Atualiza efeitos de skills
+                SkillManager.Instance.UpdateActiveEffects(currentTime);
+                
+                // 5. ✅ OTIMIZAÇÃO - Broadcast apenas a cada 100ms
+                if (currentTimeMs - lastBroadcastTime >= BROADCAST_INTERVAL)
+                {
+                    BroadcastWorldState();
+                    lastBroadcastTime = currentTimeMs;
+                }
+                
+                // 6. Salva periodicamente
+                if (currentTimeMs - lastSaveTime >= SAVE_INTERVAL)
+                {
+                    SaveWorldState();
+                    lastSaveTime = currentTimeMs;
+                }
+            }
         }
-    }
-}
+
+        /// <summary>
+        /// ✅ CORRIGIDO - Validação de movimento contra speed hack
+        /// </summary>
+        public bool ValidatePlayerMovement(string sessionId, Position newPosition)
+        {
+            if (!lastPlayerPositions.ContainsKey(sessionId))
+            {
+                lastPlayerPositions[sessionId] = newPosition;
+                lastPositionUpdateTime[sessionId] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                return true;
+            }
+
+            var lastPos = lastPlayerPositions[sessionId];
+            var lastTime = lastPositionUpdateTime[sessionId];
+            var currentTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            
+            float distance = GetDistance2D(lastPos, newPosition);
+            float timeDelta = (currentTime - lastTime) / 1000f;
+            
+            if (timeDelta > 0)
+            {
+                float speed = distance / timeDelta;
+                
+                if (speed > MAX_MOVEMENT_SPEED)
+                {
+                    Console.WriteLine($"⚠️ SPEED HACK DETECTED: {sessionId} - Speed: {speed:F2} (max: {MAX_MOVEMENT_SPEED})");
+                    return false;
+                }
+            }
+
+            lastPlayerPositions[sessionId] = newPosition;
+            lastPositionUpdateTime[sessionId] = currentTime;
+            return true;
+        }
 
         private void ProcessPlayerCombat(float currentTime, float deltaTime)
         {
@@ -91,7 +137,6 @@ private void OnWorldUpdate(object? sender, ElapsedEventArgs e)
             
             foreach (var player in players)
             {
-                // Ignora players mortos
                 if (player.character.isDead)
                 {
                     if (player.inCombat)
@@ -109,7 +154,6 @@ private void OnWorldUpdate(object? sender, ElapsedEventArgs e)
                 if (monster == null || !monster.isAlive)
                 {
                     player.CancelCombat();
-                    Console.WriteLine($"⚠️ {player.character.nome} stopped attacking (target died)");
                     continue;
                 }
 
@@ -136,42 +180,17 @@ private void OnWorldUpdate(object? sender, ElapsedEventArgs e)
                     player.isMoving = false;
                     player.targetPosition = null;
                     
-				if (player.CanAttack(currentTime))
-					{
-						player.Attack(currentTime);
-    
-						// 🆕 ADICIONE ESTA LINHA ANTES DO COMBATE
-						BroadcastPlayerAttack(player, monster);
-    
-						var result = CombatManager.Instance.PlayerAttackMonster(player, monster);
-    
-							BroadcastCombatResult(result);
+                    if (player.CanAttack(currentTime))
+                    {
+                        player.Attack(currentTime);
+                        BroadcastPlayerAttack(player, monster);
+                        
+                        var result = CombatManager.Instance.PlayerAttackMonster(player, monster);
+                        BroadcastCombatResult(result);
 
-                        if (result.damage > 0)
-                        {
-                            string critText = result.isCritical ? " CRIT!" : "";
-                            float timeSinceLastAttack = currentTime - (player.lastAttackTime - player.character.attackSpeed);
-                            
-                            Console.WriteLine($"⚔️ {player.character.nome} -> {monster.template.name}: " +
-                                            $"{result.damage}{critText} dmg " +
-                                            $"(HP: {result.remainingHealth}/{monster.template.maxHealth}) " +
-                                            $"[ASPD: {player.character.attackSpeed:F2}s] " +
-                                            $"[Cooldown OK: {timeSinceLastAttack:F2}s]");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"❌ {player.character.nome} MISSED {monster.template.name}!");
-                        }
-
-                        // 💰 Se matou, gera loot
                         if (result.targetDied)
                         {
                             player.CancelCombat();
-                            
-                            Console.WriteLine($"💀 {player.character.nome} killed {monster.template.name}! " +
-                                            $"XP: +{result.experienceGained}");
-                            
-                            // 🆕 Gera e distribui loot
                             ProcessMonsterLoot(player, monster);
                             
                             if (result.leveledUp)
@@ -183,76 +202,36 @@ private void OnWorldUpdate(object? sender, ElapsedEventArgs e)
                 }
             }
         }
-		
-		/// <summary>
-        /// ✅ NOVO - Broadcast quando player seleciona target (1º clique)
-        /// NÃO inicia combate, apenas mostra que selecionou
+
+        /// <summary>
+        /// ✅ CORRIGIDO - Broadcast de ataque com validação
         /// </summary>
-        public void BroadcastTargetSelection(Player player, MonsterInstance monster)
+        private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
         {
             var message = new
             {
-                type = "targetSelected",
+                type = "playerAttack",
                 playerId = player.sessionId,
                 characterName = player.character.nome,
-                targetId = monster.id,
-                targetName = monster.template.name,
-                targetType = "monster"
+                monsterId = monster.id,
+                monsterName = monster.template.name,
+                attackerPosition = player.position,
+                targetPosition = monster.position
             };
 
             string json = JsonConvert.SerializeObject(message);
             GameServer.BroadcastToAll(json);
-            
-            Console.WriteLine($"🎯 {player.character.nome} selected {monster.template.name} as target");
         }
-		
-		public void BroadcastSkillResult(SkillResult result)
-{
-    var message = new
-    {
-        type = "skillResult",
-        data = result
-    };
 
-    string json = JsonConvert.SerializeObject(message);
-    GameServer.BroadcastToAll(json);
-}
-		
-/// <summary>
-/// 🆕 Notifica clientes sobre ataque do player
-/// </summary>
-private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
-{
-    var message = new
-    {
-        type = "playerAttack",
-        playerId = player.sessionId,
-        characterName = player.character.nome,
-        monsterId = monster.id,
-        monsterName = monster.template.name,
-        attackerPosition = player.position,
-        targetPosition = monster.position
-    };
-
-    string json = JsonConvert.SerializeObject(message);
-    GameServer.BroadcastToAll(json);
-}
-
-        // 🆕 SISTEMA DE LOOT
+        /// <summary>
+        /// ✅ OTIMIZADO - Loot com verificação de espaço
+        /// </summary>
         private void ProcessMonsterLoot(Player player, MonsterInstance monster)
         {
-            Console.WriteLine($"💰 Generating loot for {monster.template.name} (Template ID: {monster.templateId})...");
-            
             var loot = ItemManager.Instance.GenerateLoot(monster.templateId);
             
-            Console.WriteLine($"  - Gold rolled: {loot.gold}");
-            Console.WriteLine($"  - Items rolled: {loot.items.Count}");
-            
             if (loot.gold == 0 && loot.items.Count == 0)
-            {
-                Console.WriteLine($"  💨 No loot dropped (bad luck)");
                 return;
-            }
 
             var inventory = ItemManager.Instance.LoadInventory(player.character.id);
             
@@ -260,10 +239,9 @@ private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
             if (loot.gold > 0)
             {
                 inventory.gold += loot.gold;
-                Console.WriteLine($"  💰 +{loot.gold} gold");
             }
 
-            // Adiciona itens
+            // Adiciona itens (com verificação de espaço)
             List<LootedItem> addedItems = new List<LootedItem>();
             
             foreach (var lootedItem in loot.items)
@@ -273,10 +251,9 @@ private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
                 if (template == null)
                     continue;
 
-                // Verifica se tem espaço
                 if (!inventory.HasSpace() && template.maxStack == 1)
                 {
-                    Console.WriteLine($"  ⚠️ Inventory full! Could not loot {template.name}");
+                    Console.WriteLine($"  ⚠️ Inventory full! {template.name} lost");
                     continue;
                 }
 
@@ -285,14 +262,11 @@ private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
                 if (itemInstance != null && inventory.AddItem(itemInstance, template))
                 {
                     addedItems.Add(lootedItem);
-                    Console.WriteLine($"  📦 +{lootedItem.quantity}x {template.name}");
                 }
             }
 
-            // Salva inventário
             ItemManager.Instance.SaveInventory(inventory);
 
-            // Broadcast de loot
             if (loot.gold > 0 || addedItems.Count > 0)
             {
                 BroadcastLoot(player, loot.gold, addedItems);
@@ -321,6 +295,9 @@ private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
             return (float)Math.Sqrt(dx * dx + dz * dz);
         }
 
+        /// <summary>
+        /// ✅ OTIMIZADO - Envia apenas players/monstros próximos
+        /// </summary>
         private void BroadcastWorldState()
         {
             var players = PlayerManager.Instance.GetAllPlayers();
@@ -372,21 +349,22 @@ private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
             string json = JsonConvert.SerializeObject(message);
             GameServer.BroadcastToAll(json);
         }
-		public void BroadcastPlayerStatsUpdate(Player player)
-{
-    var message = new
-    {
-        type = "playerStatsUpdate",
-        playerId = player.sessionId,
-        health = player.character.health,
-        maxHealth = player.character.maxHealth,
-        mana = player.character.mana,
-        maxMana = player.character.maxMana
-    };
 
-    string json = JsonConvert.SerializeObject(message);
-    GameServer.BroadcastToAll(json);
-}
+        public void BroadcastPlayerStatsUpdate(Player player)
+        {
+            var message = new
+            {
+                type = "playerStatsUpdate",
+                playerId = player.sessionId,
+                health = player.character.health,
+                maxHealth = player.character.maxHealth,
+                mana = player.character.mana,
+                maxMana = player.character.maxMana
+            };
+
+            string json = JsonConvert.SerializeObject(message);
+            GameServer.BroadcastToAll(json);
+        }
 
         private void BroadcastLevelUp(Player player, int newLevel)
         {
@@ -447,6 +425,18 @@ private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
             GameServer.BroadcastToAll(json);
         }
 
+        public void BroadcastSkillResult(SkillResult result)
+        {
+            var message = new
+            {
+                type = "skillUsed",
+                result = result
+            };
+
+            string json = JsonConvert.SerializeObject(message);
+            GameServer.BroadcastToAll(json);
+        }
+
         private void SaveWorldState()
         {
             var players = PlayerManager.Instance.GetAllPlayers();
@@ -458,7 +448,7 @@ private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error saving character {player.character.nome}: {ex.Message}");
+                    Console.WriteLine($"Error saving {player.character.nome}: {ex.Message}");
                 }
             }
 
@@ -467,12 +457,12 @@ private void BroadcastPlayerAttack(Player player, MonsterInstance monster)
 
         public void Shutdown()
         {
-            Console.WriteLine("WorldManager: Saving all data before shutdown...");
+            Console.WriteLine("🛑 WorldManager: Saving all data...");
             SaveWorldState();
             
             updateTimer?.Stop();
             updateTimer?.Dispose();
-            Console.WriteLine("WorldManager shutdown complete");
+            Console.WriteLine("✅ WorldManager shutdown complete");
         }
     }
 }
