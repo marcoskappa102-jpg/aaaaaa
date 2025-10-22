@@ -21,9 +21,9 @@ namespace MMOServer.Utils
 
                     case "register":
                         return HandleRegister(json);
-						
-					case "ping":
-						return HandlePing(json);
+                        
+                    case "ping":
+                        return HandlePing(json);
 
                     case "createCharacter":
                         return HandleCreateCharacter(json);
@@ -63,20 +63,22 @@ namespace MMOServer.Utils
 
                     case "getMonsters":
                         return HandleGetMonsters();
-case "useSkill":
-    return HandleUseSkill(json, sessionId);
 
-case "learnSkill":
-    return HandleLearnSkill(json, sessionId);
+                    case "useSkill":
+                        return HandleUseSkill(json, sessionId);
 
-case "levelUpSkill":
-    return HandleLevelUpSkill(json, sessionId);
+                    case "learnSkill":
+                        return HandleLearnSkill(json, sessionId);
 
-case "getSkills":
-    return HandleGetSkills(json, sessionId);
+                    case "levelUpSkill":
+                        return HandleLevelUpSkill(json, sessionId);
 
-case "getSkillList":
-    return HandleGetSkillList(json, sessionId);
+                    case "getSkills":
+                        return HandleGetSkills(json, sessionId);
+
+                    case "getSkillList":
+                        return HandleGetSkillList(json, sessionId);
+
                     default:
                         return JsonConvert.SerializeObject(new { type = "error", message = "Unknown message type" });
                 }
@@ -121,207 +123,198 @@ case "getSkillList":
             });
         }
 
-    private static string HandleCreateCharacter(JObject json)
-{
-    var accountId = json["accountId"]?.ToObject<int>() ?? 0;
-    var nome = json["nome"]?.ToString();
-    var raca = json["raca"]?.ToString();
-    var classe = json["classe"]?.ToString();
-
-    Console.WriteLine($"📝 Create Character Request:");
-    Console.WriteLine($"   Account ID: {accountId}");
-    Console.WriteLine($"   Name: {nome}");
-    Console.WriteLine($"   Race: {raca}");
-    Console.WriteLine($"   Class: {classe}");
-
-    // ✅ VALIDAÇÃO BÁSICA
-    if (accountId == 0)
-    {
-        Console.WriteLine("❌ Invalid account ID");
-        return JsonConvert.SerializeObject(new 
-        { 
-            type = "createCharacterResponse", 
-            success = false, 
-            message = "ID de conta inválido" 
-        });
-    }
-
-    if (string.IsNullOrWhiteSpace(nome) || 
-        string.IsNullOrWhiteSpace(raca) || 
-        string.IsNullOrWhiteSpace(classe))
-    {
-        Console.WriteLine("❌ Missing required fields");
-        return JsonConvert.SerializeObject(new 
-        { 
-            type = "createCharacterResponse", 
-            success = false, 
-            message = "Preencha todos os campos" 
-        });
-    }
-
-    // ✅ VALIDAÇÃO USANDO CharacterManager
-    var validation = CharacterManager.Instance.ValidateCharacterCreation(nome, raca, classe);
-    
-    if (!validation.valid)
-    {
-        Console.WriteLine($"❌ Validation failed: {validation.message}");
-        return JsonConvert.SerializeObject(new 
-        { 
-            type = "createCharacterResponse", 
-            success = false, 
-            message = validation.message 
-        });
-    }
-
-    // ✅ CRIA O PERSONAGEM (agora usando classes.json)
-    var character = CharacterManager.Instance.CreateCharacter(accountId, nome, raca, classe);
-    
-    if (character != null)
-    {
-        Console.WriteLine($"✅ Character '{nome}' created successfully!");
-        
-        return JsonConvert.SerializeObject(new 
-        { 
-            type = "createCharacterResponse", 
-            success = true,
-            message = $"Personagem {nome} criado com sucesso!",
-            character = new
-            {
-                id = character.id,
-                nome = character.nome,
-                raca = character.raca,
-                classe = character.classe,
-                level = character.level,
-                health = character.health,
-                maxHealth = character.maxHealth,
-                mana = character.mana,
-                maxMana = character.maxMana,
-                strength = character.strength,
-                intelligence = character.intelligence,
-                dexterity = character.dexterity,
-                vitality = character.vitality,
-                attackPower = character.attackPower,
-                defense = character.defense,
-                position = character.position
-            }
-        });
-    }
-
-    Console.WriteLine("❌ Failed to create character in database");
-    return JsonConvert.SerializeObject(new 
-    { 
-        type = "createCharacterResponse", 
-        success = false, 
-        message = "Erro ao salvar personagem no banco de dados" 
-    });
-}
-
-  private static string HandleSelectCharacter(JObject json, string sessionId)
-{
-    var characterId = json["characterId"]?.ToObject<int>() ?? 0;
-
-    if (characterId == 0)
-    {
-        return JsonConvert.SerializeObject(new { type = "selectCharacterResponse", success = false, message = "Invalid character" });
-    }
-
-    var character = CharacterManager.Instance.GetCharacter(characterId);
-    
-    if (character != null)
-    {
-        // ✅ NOVO: Auto-respawn se estiver morto
-        if (character.isDead)
+        private static string HandleCreateCharacter(JObject json)
         {
-            Console.WriteLine($"💀 {character.nome} was dead. Auto-respawning...");
+            var accountId = json["accountId"]?.ToObject<int>() ?? 0;
+            var nome = json["nome"]?.ToString();
+            var raca = json["raca"]?.ToString();
+            var classe = json["classe"]?.ToString();
+
+            Console.WriteLine($"📝 Create Character Request:");
+            Console.WriteLine($"   Account ID: {accountId}");
+            Console.WriteLine($"   Name: {nome}");
+            Console.WriteLine($"   Race: {raca}");
+            Console.WriteLine($"   Class: {classe}");
+
+            if (accountId == 0)
+            {
+                Console.WriteLine("❌ Invalid account ID");
+                return JsonConvert.SerializeObject(new 
+                { 
+                    type = "createCharacterResponse", 
+                    success = false, 
+                    message = "ID de conta inválido" 
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(nome) || 
+                string.IsNullOrWhiteSpace(raca) || 
+                string.IsNullOrWhiteSpace(classe))
+            {
+                Console.WriteLine("❌ Missing required fields");
+                return JsonConvert.SerializeObject(new 
+                { 
+                    type = "createCharacterResponse", 
+                    success = false, 
+                    message = "Preencha todos os campos" 
+                });
+            }
+
+            var validation = CharacterManager.Instance.ValidateCharacterCreation(nome, raca, classe);
             
-            // Pega posição de spawn da raça
-            var spawnPosition = CharacterManager.Instance.GetSpawnPosition(character.raca);
+            if (!validation.valid)
+            {
+                Console.WriteLine($"❌ Validation failed: {validation.message}");
+                return JsonConvert.SerializeObject(new 
+                { 
+                    type = "createCharacterResponse", 
+                    success = false, 
+                    message = validation.message 
+                });
+            }
+
+            var character = CharacterManager.Instance.CreateCharacter(accountId, nome, raca, classe);
             
-            // Adiciona pequeno offset aleatório
-            Random rand = new Random();
-            spawnPosition.x += (float)(rand.NextDouble() * 2 - 1);
-            spawnPosition.z += (float)(rand.NextDouble() * 2 - 1);
-            
-            // Ajusta ao terreno
-            TerrainHeightmap.Instance.ClampToGround(spawnPosition, 0f);
-            
-            // Revive o personagem
-            character.Respawn(spawnPosition);
-            
-            // Salva no banco
-            DatabaseHandler.Instance.UpdateCharacter(character);
-            
-            Console.WriteLine($"✨ {character.nome} auto-respawned at ({spawnPosition.x:F1}, {spawnPosition.y:F1}, {spawnPosition.z:F1})");
+            if (character != null)
+            {
+                Console.WriteLine($"✅ Character '{nome}' created successfully!");
+                
+                return JsonConvert.SerializeObject(new 
+                { 
+                    type = "createCharacterResponse", 
+                    success = true,
+                    message = $"Personagem {nome} criado com sucesso!",
+                    character = new
+                    {
+                        id = character.id,
+                        nome = character.nome,
+                        raca = character.raca,
+                        classe = character.classe,
+                        level = character.level,
+                        health = character.health,
+                        maxHealth = character.maxHealth,
+                        mana = character.mana,
+                        maxMana = character.maxMana,
+                        strength = character.strength,
+                        intelligence = character.intelligence,
+                        dexterity = character.dexterity,
+                        vitality = character.vitality,
+                        attackPower = character.attackPower,
+                        defense = character.defense,
+                        position = character.position
+                    }
+                });
+            }
+
+            Console.WriteLine("❌ Failed to create character in database");
+            return JsonConvert.SerializeObject(new 
+            { 
+                type = "createCharacterResponse", 
+                success = false, 
+                message = "Erro ao salvar personagem no banco de dados" 
+            });
         }
-        
-        var player = new Player
+
+        private static string HandleSelectCharacter(JObject json, string sessionId)
         {
-            sessionId = sessionId,
-            character = character,
-            position = character.position,
-            lastAttackTime = -999f
-        };
+            var characterId = json["characterId"]?.ToObject<int>() ?? 0;
 
-        PlayerManager.Instance.AddPlayer(sessionId, player);
-
-        var allPlayers = PlayerManager.Instance.GetAllPlayers()
-            .Select(p => new
+            if (characterId == 0)
             {
-                playerId = p.sessionId,
-                characterName = p.character.nome,
-                position = p.position,
-                raca = p.character.raca,
-                classe = p.character.classe,
-                level = p.character.level,
-                health = p.character.health,
-                maxHealth = p.character.maxHealth,
-                mana = p.character.mana,
-                maxMana = p.character.maxMana,
-                experience = p.character.experience,
-                statusPoints = p.character.statusPoints,
-                isMoving = p.isMoving,
-                targetPosition = p.targetPosition,
-                inCombat = p.inCombat,
-                targetMonsterId = p.targetMonsterId,
-                isDead = p.character.isDead
-            }).ToList();
-
-        var allMonsters = MonsterManager.Instance.GetAllMonsterStates();
-        var inventory = ItemManager.Instance.LoadInventory(characterId);
-
-        var newPlayerMessage = JsonConvert.SerializeObject(new
-        {
-            type = "playerJoined",
-            player = new
-            {
-                playerId = sessionId,
-                characterName = character.nome,
-                position = character.position,
-                raca = character.raca,
-                classe = character.classe,
-                level = character.level,
-                health = character.health,
-                maxHealth = character.maxHealth
+                return JsonConvert.SerializeObject(new { type = "selectCharacterResponse", success = false, message = "Invalid character" });
             }
-        });
 
-        Console.WriteLine($"✅ {character.nome} entered the world [HP: {character.health}/{character.maxHealth}] [Dead: {character.isDead}]");
+            var character = CharacterManager.Instance.GetCharacter(characterId);
+            
+            if (character != null)
+            {
+                if (character.isDead)
+                {
+                    Console.WriteLine($"💀 {character.nome} was dead. Auto-respawning...");
+                    
+                    var spawnPosition = CharacterManager.Instance.GetSpawnPosition(character.raca);
+                    
+                    Random rand = new Random();
+                    spawnPosition.x += (float)(rand.NextDouble() * 2 - 1);
+                    spawnPosition.z += (float)(rand.NextDouble() * 2 - 1);
+                    
+                    TerrainHeightmap.Instance.ClampToGround(spawnPosition, 0f);
+                    
+                    character.Respawn(spawnPosition);
+                    
+                    DatabaseHandler.Instance.UpdateCharacter(character);
+                    
+                    Console.WriteLine($"✨ {character.nome} auto-respawned at ({spawnPosition.x:F1}, {spawnPosition.y:F1}, {spawnPosition.z:F1})");
+                }
+                
+                var player = new Player
+                {
+                    sessionId = sessionId,
+                    character = character,
+                    position = character.position,
+                    lastAttackTime = -999f
+                };
 
-        return "BROADCAST:" + newPlayerMessage + "|||" +
-               JsonConvert.SerializeObject(new 
-               { 
-                   type = "selectCharacterResponse", 
-                   success = true, 
-                   character = character,
-                   playerId = sessionId,
-                   allPlayers = allPlayers,
-                   allMonsters = allMonsters,
-                   inventory = inventory
-               });
-    }
+                PlayerManager.Instance.AddPlayer(sessionId, player);
 
-    return JsonConvert.SerializeObject(new { type = "selectCharacterResponse", success = false, message = "Character not found" });
-}
+                var allPlayers = PlayerManager.Instance.GetAllPlayers()
+                    .Select(p => new
+                    {
+                        playerId = p.sessionId,
+                        characterName = p.character.nome,
+                        position = p.position,
+                        raca = p.character.raca,
+                        classe = p.character.classe,
+                        level = p.character.level,
+                        health = p.character.health,
+                        maxHealth = p.character.maxHealth,
+                        mana = p.character.mana,
+                        maxMana = p.character.maxMana,
+                        experience = p.character.experience,
+                        statusPoints = p.character.statusPoints,
+                        isMoving = p.isMoving,
+                        targetPosition = p.targetPosition,
+                        inCombat = p.inCombat,
+                        targetMonsterId = p.targetMonsterId,
+                        isDead = p.character.isDead
+                    }).ToList();
+
+                var allMonsters = MonsterManager.Instance.GetAllMonsterStates();
+                var inventory = ItemManager.Instance.LoadInventory(characterId);
+
+                var newPlayerMessage = JsonConvert.SerializeObject(new
+                {
+                    type = "playerJoined",
+                    player = new
+                    {
+                        playerId = sessionId,
+                        characterName = character.nome,
+                        position = character.position,
+                        raca = character.raca,
+                        classe = character.classe,
+                        level = character.level,
+                        health = character.health,
+                        maxHealth = character.maxHealth
+                    }
+                });
+
+                Console.WriteLine($"✅ {character.nome} entered the world [HP: {character.health}/{character.maxHealth}] [Dead: {character.isDead}]");
+
+                return "BROADCAST:" + newPlayerMessage + "|||" +
+                       JsonConvert.SerializeObject(new 
+                       { 
+                           type = "selectCharacterResponse", 
+                           success = true, 
+                           character = character,
+                           playerId = sessionId,
+                           allPlayers = allPlayers,
+                           allMonsters = allMonsters,
+                           inventory = inventory
+                       });
+            }
+
+            return JsonConvert.SerializeObject(new { type = "selectCharacterResponse", success = false, message = "Character not found" });
+        }
 
         private static string HandleMoveRequest(JObject json, string sessionId)
         {
@@ -358,9 +351,6 @@ case "getSkillList":
             return JsonConvert.SerializeObject(new { type = "error", message = "Failed to set target" });
         }
 
-/// <summary>
-        /// ✅ CORRIGIDO - Handler de ataque com validação melhorada
-        /// </summary>
         private static string HandleAttackMonster(JObject json, string sessionId)
         {
             var monsterId = json["monsterId"]?.ToObject<int>() ?? 0;
@@ -388,7 +378,6 @@ case "getSkillList":
                 return JsonConvert.SerializeObject(new { type = "error", message = "Monster not found or dead" });
             }
 
-            // ✅ CORREÇÃO - Se já está atacando o mesmo monstro, não faz nada
             if (player.inCombat && player.targetMonsterId == monsterId)
             {
                 Console.WriteLine($"⚠️ {player.character.nome} already attacking {monster.template.name}");
@@ -401,13 +390,11 @@ case "getSkillList":
                 });
             }
 
-            // ✅ CORREÇÃO - Se está atacando outro monstro, troca de target
             if (player.inCombat && player.targetMonsterId != monsterId)
             {
                 Console.WriteLine($"🔄 {player.character.nome} switching target to {monster.template.name}");
             }
 
-            // Inicia combate
             player.inCombat = true;
             player.targetMonsterId = monsterId;
             player.targetPosition = new Position
@@ -532,8 +519,6 @@ case "getSkillList":
 
             return JsonConvert.SerializeObject(new { type = "error", message = "Failed to add status point" });
         }
-
-        // ==================== INVENTÁRIO ====================
 
         private static string HandleGetInventory(JObject json, string sessionId)
         {
@@ -687,63 +672,61 @@ case "getSkillList":
             return JsonConvert.SerializeObject(new { type = "error", message = "Failed to use item" });
         }
 
-private static string HandleEquipItem(JObject json, string sessionId)
-{
-    var instanceId = json["instanceId"]?.ToObject<int>() ?? 0;
-
-    if (instanceId == 0)
-    {
-        return JsonConvert.SerializeObject(new { type = "error", message = "Item inválido" });
-    }
-
-    var success = ItemManager.Instance.EquipItem(sessionId, instanceId);
-
-    if (success)
-    {
-        var player = PlayerManager.Instance.GetPlayer(sessionId);
-        
-        if (player != null)
+        private static string HandleEquipItem(JObject json, string sessionId)
         {
-            var inventory = ItemManager.Instance.LoadInventory(player.character.id);
-            
-            var message = new
+            var instanceId = json["instanceId"]?.ToObject<int>() ?? 0;
+
+            if (instanceId == 0)
             {
-                type = "itemEquipped",
-                playerId = sessionId,
-                instanceId = instanceId,
-                newStats = new
+                return JsonConvert.SerializeObject(new { type = "error", message = "Item inválido" });
+            }
+
+            var success = ItemManager.Instance.EquipItem(sessionId, instanceId);
+
+            if (success)
+            {
+                var player = PlayerManager.Instance.GetPlayer(sessionId);
+                
+                if (player != null)
                 {
-                    strength = player.character.strength,
-                    intelligence = player.character.intelligence,
-                    dexterity = player.character.dexterity,
-                    vitality = player.character.vitality,
-                    maxHealth = player.character.maxHealth,
-                    maxMana = player.character.maxMana,
-                    attackPower = player.character.attackPower,
-                    magicPower = player.character.magicPower,
-                    defense = player.character.defense,
-                    attackSpeed = player.character.attackSpeed
-                },
-                equipment = new
-                {
-                    weaponId = inventory.weaponId,
-                    armorId = inventory.armorId,
-                    helmetId = inventory.helmetId,
-                    bootsId = inventory.bootsId,
-                    glovesId = inventory.glovesId,
-                    ringId = inventory.ringId,
-                    necklaceId = inventory.necklaceId
+                    var inventory = ItemManager.Instance.LoadInventory(player.character.id);
+                    
+                    var message = new
+                    {
+                        type = "itemEquipped",
+                        playerId = sessionId,
+                        instanceId = instanceId,
+                        newStats = new
+                        {
+                            strength = player.character.strength,
+                            intelligence = player.character.intelligence,
+                            dexterity = player.character.dexterity,
+                            vitality = player.character.vitality,
+                            maxHealth = player.character.maxHealth,
+                            maxMana = player.character.maxMana,
+                            attackPower = player.character.attackPower,
+                            magicPower = player.character.magicPower,
+                            defense = player.character.defense,
+                            attackSpeed = player.character.attackSpeed
+                        },
+                        equipment = new
+                        {
+                            weaponId = inventory.weaponId,
+                            armorId = inventory.armorId,
+                            helmetId = inventory.helmetId,
+                            bootsId = inventory.bootsId,
+                            glovesId = inventory.glovesId,
+                            ringId = inventory.ringId,
+                            necklaceId = inventory.necklaceId
+                        }
+                    };
+
+                    return "BROADCAST:" + JsonConvert.SerializeObject(message);
                 }
-            };
+            }
 
-            return "BROADCAST:" + JsonConvert.SerializeObject(message);
+            return JsonConvert.SerializeObject(new { type = "equipFailed", silent = true });
         }
-    }
-
-    // ✅ CORREÇÃO: Não retorna erro genérico, apenas falha silenciosamente
-    // O cliente vai receber a resposta de inventário atualizada e ver que não equipou
-    return JsonConvert.SerializeObject(new { type = "equipFailed", silent = true });
-}
 
         private static string HandleUnequipItem(JObject json, string sessionId)
         {
@@ -892,301 +875,296 @@ private static string HandleEquipItem(JObject json, string sessionId)
             var monsters = MonsterManager.Instance.GetAllMonsterStates();
             return JsonConvert.SerializeObject(new { type = "monstersResponse", monsters = monsters });
         }
-	
-		private static string HandlePing(JObject json)
-		{
-		var timestamp = json["timestamp"]?.ToObject<long>() ?? 0;
     
-		// Responde com pong
-		return JsonConvert.SerializeObject(new
-		{
-        type = "pong",
-        timestamp = timestamp,
-        serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-		});
-		}
-		
-// ==================== HANDLERS DE SKILLS ====================
-
-private static string HandleUseSkill(JObject json, string sessionId)
-{
-    try
-    {
-        var request = new UseSkillRequest
+        private static string HandlePing(JObject json)
         {
-            skillId = json["skillId"]?.ToObject<int>() ?? 0,
-            slotNumber = json["slotNumber"]?.ToObject<int>() ?? 0,
-            targetId = json["targetId"]?.ToString(),
-            targetType = json["targetType"]?.ToString() ?? "monster",
-            targetPosition = json["targetPosition"]?.ToObject<Position>()
-        };
-
-        if (request.skillId == 0)
-        {
-            return JsonConvert.SerializeObject(new 
-            { 
-                type = "error", 
-                message = "Invalid skill ID" 
-            });
-        }
-
-        var player = PlayerManager.Instance.GetPlayer(sessionId);
+            var timestamp = json["timestamp"]?.ToObject<long>() ?? 0;
         
-        if (player == null)
-        {
-            return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
-        }
-
-        float currentTime = (float)(DateTime.UtcNow - new DateTime(2025, 1, 1)).TotalSeconds;
-        var result = SkillManager.Instance.UseSkill(player, request, currentTime);
-
-        if (result.success)
-        {
-            Console.WriteLine($"⚔️ {player.character.nome} used skill {request.skillId}");
-            
-            // Atualiza MP/HP do jogador
-            WorldManager.Instance.BroadcastPlayerStatsUpdate(player);
-            
-            // Broadcast resultado da skill
-            var message = new
-            {
-                type = "skillUsed",
-                result = result
-            };
-
-            return "BROADCAST:" + JsonConvert.SerializeObject(message);
-        }
-        else
-        {
             return JsonConvert.SerializeObject(new
             {
-                type = "skillUseFailed",
-                skillId = request.skillId,
-                reason = result.failReason
+                type = "pong",
+                timestamp = timestamp,
+                serverTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             });
         }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ Error in HandleUseSkill: {ex.Message}");
-        return JsonConvert.SerializeObject(new { type = "error", message = ex.Message });
-    }
-}
-
-private static string HandleLearnSkill(JObject json, string sessionId)
-{
-    var skillId = json["skillId"]?.ToObject<int>() ?? 0;
-    var slotNumber = json["slotNumber"]?.ToObject<int>() ?? 0;
-
-    if (skillId == 0 || slotNumber == 0)
-    {
-        return JsonConvert.SerializeObject(new { type = "error", message = "Invalid parameters" });
-    }
-
-    var player = PlayerManager.Instance.GetPlayer(sessionId);
-    
-    if (player == null)
-    {
-        return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
-    }
-
-    bool success = SkillManager.Instance.LearnSkill(player, skillId, slotNumber);
-
-    if (success)
-    {
-        var template = SkillManager.Instance.GetSkillTemplate(skillId);
         
-        return JsonConvert.SerializeObject(new
+        // ==================== HANDLERS DE SKILLS ====================
+
+        private static string HandleUseSkill(JObject json, string sessionId)
         {
-            type = "skillLearned",
-            success = true,
-            skillId = skillId,
-            skillName = template?.name ?? "",
-            slotNumber = slotNumber
-        });
-    }
-    else
-    {
-        return JsonConvert.SerializeObject(new
-        {
-            type = "skillLearned",
-            success = false,
-            message = "Failed to learn skill"
-        });
-    }
-}
-
-private static string HandleLevelUpSkill(JObject json, string sessionId)
-{
-    var skillId = json["skillId"]?.ToObject<int>() ?? 0;
-
-    if (skillId == 0)
-    {
-        return JsonConvert.SerializeObject(new { type = "error", message = "Invalid skill ID" });
-    }
-
-    var player = PlayerManager.Instance.GetPlayer(sessionId);
-    
-    if (player == null)
-    {
-        return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
-    }
-
-    bool success = SkillManager.Instance.LevelUpSkill(player, skillId);
-
-    if (success)
-    {
-        var learnedSkill = player.character.learnedSkills?.FirstOrDefault(s => s.skillId == skillId);
-        
-        return JsonConvert.SerializeObject(new
-        {
-            type = "skillLeveledUp",
-            success = true,
-            skillId = skillId,
-            newLevel = learnedSkill?.currentLevel ?? 1,
-            statusPoints = player.character.statusPoints
-        });
-    }
-    else
-    {
-        return JsonConvert.SerializeObject(new
-        {
-            type = "skillLeveledUp",
-            success = false,
-            message = "Failed to level up skill"
-        });
-    }
-}
-
-private static string HandleGetSkills(JObject json, string sessionId)
-{
-    var player = PlayerManager.Instance.GetPlayer(sessionId);
-    
-    if (player == null)
-    {
-        return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
-    }
-
-    // ✅ CORREÇÃO: Cria lista tipada corretamente
-    var skills = new List<object>();
-
-    if (player.character.learnedSkills != null)
-    {
-        foreach (var s in player.character.learnedSkills)
-        {
-            var template = SkillManager.Instance.GetSkillTemplate(s.skillId);
-            
-            skills.Add(new
+            try
             {
-                skillId = s.skillId,
-                currentLevel = s.currentLevel,
-                slotNumber = s.slotNumber,
-                lastUsedTime = s.lastUsedTime,
-                template = template != null ? new
+                var request = new UseSkillRequest
                 {
-                    id = template.id,
-                    name = template.name,
-                    description = template.description,
-                    skillType = template.skillType,
-                    damageType = template.damageType,
-                    targetType = template.targetType,
-                    maxLevel = template.maxLevel,
-                    manaCost = template.manaCost,
-                    healthCost = template.healthCost,
-                    cooldown = template.cooldown,
-                    castTime = template.castTime,
-                    range = template.range,
-                    areaRadius = template.areaRadius,
-                    iconPath = template.iconPath,
-                    currentLevelData = template.levels.FirstOrDefault(l => l.level == s.currentLevel)
-                } : null
+                    skillId = json["skillId"]?.ToObject<int>() ?? 0,
+                    slotNumber = json["slotNumber"]?.ToObject<int>() ?? 0,
+                    targetId = json["targetId"]?.ToString(),
+                    targetType = json["targetType"]?.ToString() ?? "monster",
+                    targetPosition = json["targetPosition"]?.ToObject<Position>()
+                };
+
+                if (request.skillId == 0)
+                {
+                    return JsonConvert.SerializeObject(new 
+                    { 
+                        type = "error", 
+                        message = "Invalid skill ID" 
+                    });
+                }
+
+                var player = PlayerManager.Instance.GetPlayer(sessionId);
+                
+                if (player == null)
+                {
+                    return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
+                }
+
+                float currentTime = (float)(DateTime.UtcNow - new DateTime(2025, 1, 1)).TotalSeconds;
+                var result = SkillManager.Instance.UseSkill(player, request, currentTime);
+
+                if (result.success)
+                {
+                    Console.WriteLine($"⚔️ {player.character.nome} used skill {request.skillId}");
+                    
+                    WorldManager.Instance.BroadcastPlayerStatsUpdate(player);
+                    
+                    var message = new
+                    {
+                        type = "skillUsed",
+                        result = result
+                    };
+
+                    return "BROADCAST:" + JsonConvert.SerializeObject(message);
+                }
+                else
+                {
+                    return JsonConvert.SerializeObject(new
+                    {
+                        type = "skillUseFailed",
+                        skillId = request.skillId,
+                        reason = result.failReason
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error in HandleUseSkill: {ex.Message}");
+                return JsonConvert.SerializeObject(new { type = "error", message = ex.Message });
+            }
+        }
+
+        private static string HandleLearnSkill(JObject json, string sessionId)
+        {
+            var skillId = json["skillId"]?.ToObject<int>() ?? 0;
+            var slotNumber = json["slotNumber"]?.ToObject<int>() ?? 0;
+
+            if (skillId == 0 || slotNumber == 0)
+            {
+                return JsonConvert.SerializeObject(new { type = "error", message = "Invalid parameters" });
+            }
+
+            var player = PlayerManager.Instance.GetPlayer(sessionId);
+            
+            if (player == null)
+            {
+                return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
+            }
+
+            bool success = SkillManager.Instance.LearnSkill(player, skillId, slotNumber);
+
+            if (success)
+            {
+                var template = SkillManager.Instance.GetSkillTemplate(skillId);
+                
+                return JsonConvert.SerializeObject(new
+                {
+                    type = "skillLearned",
+                    success = true,
+                    skillId = skillId,
+                    skillName = template?.name ?? "",
+                    slotNumber = slotNumber
+                });
+            }
+            else
+            {
+                return JsonConvert.SerializeObject(new
+                {
+                    type = "skillLearned",
+                    success = false,
+                    message = "Failed to learn skill"
+                });
+            }
+        }
+
+        private static string HandleLevelUpSkill(JObject json, string sessionId)
+        {
+            var skillId = json["skillId"]?.ToObject<int>() ?? 0;
+
+            if (skillId == 0)
+            {
+                return JsonConvert.SerializeObject(new { type = "error", message = "Invalid skill ID" });
+            }
+
+            var player = PlayerManager.Instance.GetPlayer(sessionId);
+            
+            if (player == null)
+            {
+                return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
+            }
+
+            bool success = SkillManager.Instance.LevelUpSkill(player, skillId);
+
+            if (success)
+            {
+                var learnedSkill = player.character.learnedSkills?.FirstOrDefault(s => s.skillId == skillId);
+                
+                return JsonConvert.SerializeObject(new
+                {
+                    type = "skillLeveledUp",
+                    success = true,
+                    skillId = skillId,
+                    newLevel = learnedSkill?.currentLevel ?? 1,
+                    statusPoints = player.character.statusPoints
+                });
+            }
+            else
+            {
+                return JsonConvert.SerializeObject(new
+                {
+                    type = "skillLeveledUp",
+                    success = false,
+                    message = "Failed to level up skill"
+                });
+            }
+        }
+
+        private static string HandleGetSkills(JObject json, string sessionId)
+        {
+            var player = PlayerManager.Instance.GetPlayer(sessionId);
+            
+            if (player == null)
+            {
+                return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
+            }
+
+            var skills = new List<object>();
+
+            if (player.character.learnedSkills != null)
+            {
+                foreach (var s in player.character.learnedSkills)
+                {
+                    var template = SkillManager.Instance.GetSkillTemplate(s.skillId);
+                    
+                    skills.Add(new
+                    {
+                        skillId = s.skillId,
+                        currentLevel = s.currentLevel,
+                        slotNumber = s.slotNumber,
+                        lastUsedTime = s.lastUsedTime,
+                        template = template != null ? new
+                        {
+                            id = template.id,
+                            name = template.name,
+                            description = template.description,
+                            skillType = template.skillType,
+                            damageType = template.damageType,
+                            targetType = template.targetType,
+                            maxLevel = template.maxLevel,
+                            manaCost = template.manaCost,
+                            healthCost = template.healthCost,
+                            cooldown = template.cooldown,
+                            castTime = template.castTime,
+                            range = template.range,
+                            areaRadius = template.areaRadius,
+                            iconPath = template.iconPath,
+                            currentLevelData = template.levels.FirstOrDefault(l => l.level == s.currentLevel)
+                        } : null
+                    });
+                }
+            }
+
+            return JsonConvert.SerializeObject(new
+            {
+                type = "skillsResponse",
+                skills = skills
             });
         }
-    }
 
-    return JsonConvert.SerializeObject(new
-    {
-        type = "skillsResponse",
-        skills = skills
-    });
-}
-
-private static string HandleGetSkillList(JObject json, string sessionId)
-{
-    Console.WriteLine($"📖 HandleGetSkillList called for session: {sessionId}");
-    
-    var player = PlayerManager.Instance.GetPlayer(sessionId);
-    
-    if (player == null)
-    {
-        Console.WriteLine($"❌ Player not found: {sessionId}");
-        return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
-    }
-
-    Console.WriteLine($"   Player found: {player.character.nome} (Class: {player.character.classe})");
-    
-    // 🔍 CORREÇÃO: Filtra skills pela classe do personagem
-    var availableSkills = SkillManager.Instance.GetSkillsByClass(player.character.classe);
-    
-    Console.WriteLine($"   Found {availableSkills.Count} skills for class {player.character.classe}");
-
-    // 🔍 ADICIONA LOG DE DEBUG
-    if (availableSkills.Count == 0)
-    {
-        Console.WriteLine($"⚠️ WARNING: No skills found for class '{player.character.classe}'");
-        Console.WriteLine($"   Available classes in skills.json:");
-        
-        // Mostra todas as classes disponíveis
-        var allSkills = SkillManager.Instance.skillTemplates.Values.ToList();
-        var uniqueClasses = allSkills.Select(s => s.requiredClass).Distinct();
-        
-        foreach (var c in uniqueClasses)
+        // ✅ CORRIGIDO: Usa propriedade pública SkillTemplates ao invés de campo privado
+        private static string HandleGetSkillList(JObject json, string sessionId)
         {
-            Console.WriteLine($"      - {c}");
+            Console.WriteLine($"📖 HandleGetSkillList called for session: {sessionId}");
+            
+            var player = PlayerManager.Instance.GetPlayer(sessionId);
+            
+            if (player == null)
+            {
+                Console.WriteLine($"❌ Player not found: {sessionId}");
+                return JsonConvert.SerializeObject(new { type = "error", message = "Player not found" });
+            }
+
+            Console.WriteLine($"   Player found: {player.character.nome} (Class: {player.character.classe})");
+            
+            var availableSkills = SkillManager.Instance.GetSkillsByClass(player.character.classe);
+            
+            Console.WriteLine($"   Found {availableSkills.Count} skills for class {player.character.classe}");
+
+            // ✅ CORRIGIDO: Usa SkillTemplates (propriedade pública) ao invés de skillTemplates
+            if (availableSkills.Count == 0)
+            {
+                Console.WriteLine($"⚠️ WARNING: No skills found for class '{player.character.classe}'");
+                Console.WriteLine($"   Available classes in skills.json:");
+                
+                var allSkills = SkillManager.Instance.SkillTemplates.Values.ToList();
+                var uniqueClasses = allSkills.Select(s => s.requiredClass).Distinct();
+                
+                foreach (var c in uniqueClasses)
+                {
+                    Console.WriteLine($"      - {c}");
+                }
+            }
+
+            var skillList = availableSkills.Select(template => new
+            {
+                id = template.id,
+                name = template.name,
+                description = template.description,
+                skillType = template.skillType,
+                damageType = template.damageType,
+                targetType = template.targetType,
+                requiredLevel = template.requiredLevel,
+                requiredClass = template.requiredClass,
+                maxLevel = template.maxLevel,
+                manaCost = template.manaCost,
+                healthCost = template.healthCost,
+                cooldown = template.cooldown,
+                castTime = template.castTime,
+                range = template.range,
+                areaRadius = template.areaRadius,
+                iconPath = template.iconPath,
+                levels = template.levels,
+                canLearn = player.character.level >= template.requiredLevel &&
+                          (player.character.learnedSkills == null || 
+                           !player.character.learnedSkills.Any(s => s.skillId == template.id))
+            }).ToList();
+
+            Console.WriteLine($"   Sending {skillList.Count} skills to client");
+            
+            if (skillList.Count > 0)
+            {
+                var first = skillList[0];
+                Console.WriteLine($"   Example: {first.name} (Req Lv: {first.requiredLevel}, CanLearn: {first.canLearn})");
+            }
+
+            var response = JsonConvert.SerializeObject(new
+            {
+                type = "skillListResponse",
+                skills = skillList
+            });
+            
+            Console.WriteLine($"✅ Skill list response sent ({response.Length} bytes)");
+            
+            return response;
         }
     }
-
-    var skillList = availableSkills.Select(template => new
-    {
-        id = template.id,
-        name = template.name,
-        description = template.description,
-        skillType = template.skillType,
-        damageType = template.damageType,
-        targetType = template.targetType,
-        requiredLevel = template.requiredLevel,
-        requiredClass = template.requiredClass,
-        maxLevel = template.maxLevel,
-        manaCost = template.manaCost,
-        healthCost = template.healthCost,
-        cooldown = template.cooldown,
-        castTime = template.castTime,
-        range = template.range,
-        areaRadius = template.areaRadius,
-        iconPath = template.iconPath,
-        levels = template.levels,
-        canLearn = player.character.level >= template.requiredLevel &&
-                  (player.character.learnedSkills == null || 
-                   !player.character.learnedSkills.Any(s => s.skillId == template.id))
-    }).ToList();
-
-    Console.WriteLine($"   Sending {skillList.Count} skills to client");
-    
-    if (skillList.Count > 0)
-    {
-        var first = skillList[0];
-        Console.WriteLine($"   Example: {first.name} (Req Lv: {first.requiredLevel}, CanLearn: {first.canLearn})");
-    }
-
-    var response = JsonConvert.SerializeObject(new
-    {
-        type = "skillListResponse",
-        skills = skillList
-    });
-    
-    Console.WriteLine($"✅ Skill list response sent ({response.Length} bytes)");
-    
-    return response;
-}
-}
 }
