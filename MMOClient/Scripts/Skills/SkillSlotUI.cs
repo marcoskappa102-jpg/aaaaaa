@@ -4,10 +4,6 @@ using UnityEngine.EventSystems;
 using TMPro;
 using System;
 
-/// <summary>
-/// Slot individual de skill na hotbar
-/// Coloque em: MMOClient/Scripts/UI/Skills/SkillSlotUI.cs
-/// </summary>
 public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("UI Elements")]
@@ -60,9 +56,6 @@ public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         CheckHotkey();
     }
 
-    /// <summary>
-    /// Define a skill no slot
-    /// </summary>
     public void SetSkill(LearnedSkillData skill)
     {
         learnedSkill = skill;
@@ -84,10 +77,6 @@ public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (lockedOverlay != null)
             lockedOverlay.SetActive(false);
     }
-
-    /// <summary>
-    /// Limpa o slot
-    /// </summary>
     public void Clear()
     {
         learnedSkill = null;
@@ -105,9 +94,6 @@ public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             lockedOverlay.SetActive(true);
     }
 
-    /// <summary>
-    /// Carrega sprite do ícone
-    /// </summary>
     private Sprite LoadSkillIcon(string iconPath)
     {
         if (string.IsNullOrEmpty(iconPath))
@@ -124,9 +110,6 @@ public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         return sprite;
     }
 
-    /// <summary>
-    /// Verifica se a hotkey foi pressionada
-    /// </summary>
     private void CheckHotkey()
     {
         // Verifica teclas 1-9
@@ -141,9 +124,6 @@ public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         if (Input.GetKeyDown(KeyCode.Alpha9) && slotNumber == 9) UseSkill();
     }
 
-    /// <summary>
-    /// Usa a skill
-    /// </summary>
     public void UseSkill()
     {
         if (learnedSkill == null || learnedSkill.template == null)
@@ -182,10 +162,7 @@ public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         // Inicia cooldown local (confirmação visual imediata)
         StartCooldown(learnedSkill.template.cooldown);
     }
-
-    /// <summary>
-    /// Inicia cooldown visual
-    /// </summary>
+    
     public void StartCooldown(float duration)
     {
         isOnCooldown = true;
@@ -202,9 +179,6 @@ public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
             cooldownText.gameObject.SetActive(true);
     }
 
-    /// <summary>
-    /// Atualiza cooldown
-    /// </summary>
     private void UpdateCooldown()
     {
         if (!isOnCooldown)
@@ -246,9 +220,6 @@ public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
         }
     }
 
-    /// <summary>
-    /// Flash vermelho quando não tem mana
-    /// </summary>
     private void FlashNotEnoughMana()
     {
         if (backgroundImage != null)
@@ -311,9 +282,6 @@ public class SkillSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHan
     }
 }
 
-/// <summary>
-/// Dados de skill aprendida (synced com servidor)
-/// </summary>
 [Serializable]
 public class LearnedSkillData
 {
@@ -324,9 +292,6 @@ public class LearnedSkillData
     public SkillTemplateData template;
 }
 
-/// <summary>
-/// Template de skill (estrutura do JSON)
-/// </summary>
 [Serializable]
 public class SkillTemplateData
 {
@@ -362,4 +327,5 @@ public class SkillLevelData
     public float damageMultiplier;
     public float critChanceBonus;
     public int statusPointCost;
+
 }
