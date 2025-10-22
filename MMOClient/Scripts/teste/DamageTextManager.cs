@@ -44,17 +44,11 @@ public class DamageTextManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Mostra dano normal ou crítico
-    /// </summary>
     public void ShowDamage(Vector3 worldPosition, int damage, bool isCritical)
     {
         ShowText(worldPosition, damage.ToString(), isCritical ? criticalDamageColor : normalDamageColor, isCritical);
     }
 
-    /// <summary>
-    /// Mostra dano com tipo customizado
-    /// </summary>
     public void ShowDamage(Vector3 worldPosition, int damage, bool isCritical, DamageType damageType)
     {
         Color color = damageType switch
@@ -70,41 +64,26 @@ public class DamageTextManager : MonoBehaviour
         ShowText(worldPosition, text, color, isCritical);
     }
 
-    /// <summary>
-    /// Mostra cura
-    /// </summary>
     public void ShowHeal(Vector3 worldPosition, int amount)
     {
         ShowText(worldPosition, $"+{amount}", healColor, false);
     }
 
-    /// <summary>
-    /// Mostra MISS
-    /// </summary>
     public void ShowMiss(Vector3 worldPosition)
     {
         ShowText(worldPosition, "MISS", missColor, false, 32);
     }
 
-    /// <summary>
-    /// Mostra BLOCK/DODGE/etc
-    /// </summary>
     public void ShowStatus(Vector3 worldPosition, string status, Color color)
     {
         ShowText(worldPosition, status, color, false, 32);
     }
 
-    /// <summary>
-    /// Mostra XP ganho
-    /// </summary>
     public void ShowExperience(Vector3 worldPosition, int xp)
     {
         ShowText(worldPosition, $"+{xp} XP", new Color(1f, 1f, 0.3f), false, 28);
     }
 
-    /// <summary>
-    /// Método genérico para mostrar texto
-    /// </summary>
     private void ShowText(Vector3 worldPosition, string text, Color color, bool isBig, int fontSize = 36)
     {
         if (damageTextPrefab == null)
@@ -203,12 +182,10 @@ public class DamageTextManager : MonoBehaviour
     }
 }
 
-/// <summary>
-/// Tipos de dano para diferentes cores
-/// </summary>
 public enum DamageType
 {
     Physical,
     Magical,
     True // Dano verdadeiro (ignora defesa)
+
 }
