@@ -5,7 +5,7 @@ using System.Collections.Concurrent;
 namespace MMOServer.Server
 {
     /// <summary>
-    /// ✅ VERSÃO MELHORADA - Sistema completo de Skills com segurança e performance
+    /// ✅ VERSÃO PROFISSIONAL - Sistema completo de Skills com todas as validações
     /// </summary>
     public class SkillManager
     {
@@ -20,7 +20,7 @@ namespace MMOServer.Server
             }
         }
 
-        // ✅ Thread-safe para múltiplos jogadores
+        // ✅ CORREÇÃO: Tornado público para acesso controlado
         private readonly ConcurrentDictionary<int, SkillTemplate> skillTemplates = new();
         private readonly ConcurrentDictionary<string, List<ActiveEffect>> activeEffects = new();
         private readonly ConcurrentDictionary<string, ConcurrentDictionary<int, long>> playerCooldowns = new();
@@ -28,6 +28,9 @@ namespace MMOServer.Server
         private readonly Random random = new();
         private int nextEffectId = 1;
         private readonly object effectIdLock = new();
+
+        // ✅ NOVO: Propriedade pública para acesso seguro
+        public IReadOnlyDictionary<int, SkillTemplate> SkillTemplates => skillTemplates;
 
         public void Initialize()
         {
@@ -49,8 +52,6 @@ namespace MMOServer.Server
             }
         }
 
-        // ==================== CONFIGURAÇÃO ====================
-
         private void LoadSkillTemplates()
         {
             string filePath = Path.Combine("Config", "skills.json");
@@ -58,12 +59,21 @@ namespace MMOServer.Server
             if (!File.Exists(filePath))
             {
                 Console.WriteLine($"❌ {filePath} not found!");
+                CreateDefaultSkillsConfig();
                 return;
             }
 
             try
             {
                 string json = File.ReadAllText(filePath);
+                
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    Console.WriteLine($"⚠️ {filePath} is empty!");
+                    CreateDefaultSkillsConfig();
+                    return;
+                }
+
                 var config = JsonConvert.DeserializeObject<SkillConfig>(json);
 
                 if (config?.skills != null)
@@ -77,6 +87,13 @@ namespace MMOServer.Server
                             continue;
                         }
 
+                        // ✅ VALIDAÇÃO: Garante que levels existe
+                        if (skill.levels == null || skill.levels.Count == 0)
+                        {
+                            Console.WriteLine($"⚠️ Skill {skill.name} has no level data!");
+                            continue;
+                        }
+
                         skillTemplates[skill.id] = skill;
                     }
                     
@@ -87,6 +104,53 @@ namespace MMOServer.Server
             {
                 Console.WriteLine($"❌ Error loading skills: {ex.Message}");
                 Console.WriteLine($"   StackTrace: {ex.StackTrace}");
+            }
+        }
+
+        // ✅ NOVO: Cria configuração padrão se não existir
+        private void CreateDefaultSkillsConfig()
+        {
+            Console.WriteLine("📝 Creating default skills.json...");
+            
+            var defaultConfig = new SkillConfig
+            {
+                skills = new List<SkillTemplate>
+                {
+                    // Skill exemplo para cada classe
+                    new SkillTemplate
+                    {
+                        id = 1,
+                        name = "Golpe Poderoso",
+                        description = "Ataque físico devastador",
+                        skillType = "active",
+                        damageType = "physical",
+                        targetType = "enemy",
+                        requiredLevel = 1,
+                        requiredClass = "Guerreiro",
+                        maxLevel = 10,
+                        manaCost = 10,
+                        cooldown = 3.0f,
+                        castTime = 0.5f,
+                        range = 3.5f,
+                        iconPath = "Icons/Skills/power_strike",
+                        levels = new List<SkillLevelData>
+                        {
+                            new SkillLevelData { level = 1, baseDamage = 20, damageMultiplier = 1.2f, statusPointCost = 1 }
+                        },
+                        effects = new List<SkillEffect>()
+                    }
+                }
+            };
+
+            try
+            {
+                string json = JsonConvert.SerializeObject(defaultConfig, Formatting.Indented);
+                File.WriteAllText(Path.Combine("Config", "skills.json"), json);
+                Console.WriteLine("✅ Created default skills.json");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Could not create skills.json: {ex.Message}");
             }
         }
 
@@ -105,11 +169,7 @@ namespace MMOServer.Server
                 .ToList();
         }
 
-        // ==================== USO DE SKILLS ====================
-
-        /// <summary>
-        /// ✅ MELHORADO - Usa skill com validações completas e thread-safety
-        /// </summary>
+        // ✅ MELHORADO: UseSkill com mais validações
         public SkillResult UseSkill(Player player, UseSkillRequest request, float currentTime)
         {
             var result = new SkillResult
@@ -119,7 +179,7 @@ namespace MMOServer.Server
                 attackerType = "player"
             };
 
-            // ✅ VALIDAÇÃO #1: Player válido
+            // Validação #1: Player válido
             if (player.character.isDead)
             {
                 result.success = false;
@@ -127,8 +187,11 @@ namespace MMOServer.Server
                 return result;
             }
 
-            // ✅ VALIDAÇÃO #2: Skill aprendida
-            var learnedSkill = player.character.learnedSkills?
+            // ✅ CORREÇÃO: Inicializa lista se for null
+            player.character.learnedSkills ??= new List<LearnedSkill>();
+
+            // Validação #2: Skill aprendida
+            var learnedSkill = player.character.learnedSkills
                 .FirstOrDefault(s => s.skillId == request.skillId);
 
             if (learnedSkill == null)
@@ -139,7 +202,7 @@ namespace MMOServer.Server
                 return result;
             }
 
-            // ✅ VALIDAÇÃO #3: Template existe
+            // Validação #3: Template existe
             var template = GetSkillTemplate(request.skillId);
             if (template == null)
             {
@@ -150,7 +213,7 @@ namespace MMOServer.Server
 
             learnedSkill.template = template;
 
-            // ✅ VALIDAÇÃO #4: Cooldown (thread-safe)
+            // Validação #4: Cooldown
             if (!CanUseSkill(player.sessionId, learnedSkill, currentTime))
             {
                 result.success = false;
@@ -158,7 +221,7 @@ namespace MMOServer.Server
                 return result;
             }
 
-            // ✅ VALIDAÇÃO #5: Level data válido
+            // Validação #5: Level data válido
             var levelData = GetSkillLevelData(template, learnedSkill.currentLevel);
             if (levelData == null)
             {
@@ -167,7 +230,7 @@ namespace MMOServer.Server
                 return result;
             }
 
-            // ✅ VALIDAÇÃO #6: Custos
+            // Validação #6: Custos
             if (player.character.mana < template.manaCost)
             {
                 result.success = false;
@@ -182,7 +245,7 @@ namespace MMOServer.Server
                 return result;
             }
 
-            // ✅ VALIDAÇÃO #7: Range (se aplicável)
+            // Validação #7: Range
             if (!ValidateSkillRange(player, template, request))
             {
                 result.success = false;
@@ -190,20 +253,20 @@ namespace MMOServer.Server
                 return result;
             }
 
-            // ✅ EXECUÇÃO: Consome recursos
+            // Execução: Consome recursos
             player.character.mana -= template.manaCost;
             player.character.health -= template.healthCost;
             result.manaCost = template.manaCost;
             result.healthCost = template.healthCost;
 
-            // ✅ ATUALIZA: Cooldown (thread-safe)
+            // Atualiza cooldown
             SetSkillCooldown(player.sessionId, request.skillId, currentTime);
 
-            // ✅ EXECUTA: Skill
+            // Executa skill
             result.success = true;
             ExecuteSkill(player, template, levelData, request, result, currentTime);
 
-            // ✅ SALVA: Character
+            // Salva character
             try
             {
                 DatabaseHandler.Instance.UpdateCharacter(player.character);
@@ -216,9 +279,12 @@ namespace MMOServer.Server
             return result;
         }
 
-        // ✅ NOVO: Validação de range thread-safe
         private bool ValidateSkillRange(Player player, SkillTemplate template, UseSkillRequest request)
         {
+            // Self e área não precisam de validação de range
+            if (template.targetType == "self" || template.targetType == "area")
+                return true;
+
             if (template.targetType != "enemy" || string.IsNullOrEmpty(request.targetId))
                 return true;
 
@@ -233,7 +299,6 @@ namespace MMOServer.Server
             return distance <= template.range;
         }
 
-        // ✅ MELHORADO: Sistema de cooldown thread-safe
         private bool CanUseSkill(string playerId, LearnedSkill learnedSkill, float currentTime)
         {
             if (learnedSkill.template == null)
@@ -251,7 +316,6 @@ namespace MMOServer.Server
             return timeSinceLastUse >= learnedSkill.template.cooldown;
         }
 
-        // ✅ NOVO: Define cooldown thread-safe
         private void SetSkillCooldown(string playerId, int skillId, float currentTime)
         {
             var cooldowns = playerCooldowns.GetOrAdd(playerId, _ => new ConcurrentDictionary<int, long>());
@@ -259,7 +323,6 @@ namespace MMOServer.Server
             cooldowns[skillId] = currentTimeMs;
         }
 
-        // ✅ MELHORADO: Execução de skills mais robusta
         private void ExecuteSkill(Player player, SkillTemplate template, SkillLevelData levelData, 
             UseSkillRequest request, SkillResult result, float currentTime)
         {
@@ -308,7 +371,6 @@ namespace MMOServer.Server
 
             var targetResult = CalculateSkillDamage(player, monster, template, levelData);
             
-            // ✅ THREAD-SAFE: Lock durante aplicação de dano
             lock (monster)
             {
                 int actualDamage = monster.TakeDamage(targetResult.damage);
@@ -316,7 +378,6 @@ namespace MMOServer.Server
                 targetResult.remainingHealth = monster.currentHealth;
                 targetResult.targetDied = !monster.isAlive;
 
-                // XP e level up
                 if (targetResult.targetDied)
                 {
                     int exp = CombatManager.Instance.CalculateExperienceReward(
@@ -332,9 +393,7 @@ namespace MMOServer.Server
                 }
             }
 
-            // Aplica efeitos
             ApplySkillEffects(player, monster, template, targetResult, currentTime);
-
             result.targets.Add(targetResult);
         }
 
@@ -344,7 +403,6 @@ namespace MMOServer.Server
             Position center = request.targetPosition ?? player.position;
             var monsters = MonsterManager.Instance.GetAliveMonsters();
 
-            // ✅ OTIMIZAÇÃO: Filtra monsters por distância antes de processar
             var monstersInRange = monsters
                 .Where(m => GetDistance(center, m.position) <= template.areaRadius)
                 .ToList();
@@ -433,8 +491,6 @@ namespace MMOServer.Server
             ExecuteSelfSkill(player, template, levelData, result, currentTime);
         }
 
-        // ==================== CÁLCULOS ====================
-
         private SkillTargetResult CalculateSkillDamage(Player player, MonsterInstance monster, 
             SkillTemplate template, SkillLevelData levelData)
         {
@@ -445,10 +501,8 @@ namespace MMOServer.Server
                 targetType = "monster"
             };
 
-            // Dano base
             int baseDamage = levelData.baseDamage;
 
-            // Escala com ATK ou MATK
             int attackPower = template.damageType == "magical" 
                 ? player.character.magicPower 
                 : player.character.attackPower;
@@ -490,8 +544,6 @@ namespace MMOServer.Server
             return Math.Max(1, baseHealing + scaledHealing);
         }
 
-        // ==================== EFEITOS E BUFFS ====================
-
         private void ApplySkillEffects(Player player, MonsterInstance monster, SkillTemplate template,
             SkillTargetResult targetResult, float currentTime)
         {
@@ -499,7 +551,6 @@ namespace MMOServer.Server
             {
                 if (random.NextDouble() <= effect.chance)
                 {
-                    // TODO: Implementar stun, dot, etc
                     targetResult.appliedEffects.Add(new AppliedEffect
                     {
                         effectType = effect.effectType,
@@ -570,28 +621,7 @@ namespace MMOServer.Server
             return new List<ActiveEffect>();
         }
 
-        // ==================== APRENDIZADO DE SKILLS ====================
-
-        public (bool canLearn, string reason) CanLearnSkill(Character character, int skillId)
-        {
-            var template = GetSkillTemplate(skillId);
-            
-            if (template == null)
-                return (false, "Skill não encontrada");
-
-            if (character.level < template.requiredLevel)
-                return (false, $"Nível insuficiente (requer {template.requiredLevel})");
-
-            if (!string.IsNullOrEmpty(template.requiredClass) && 
-                !string.Equals(template.requiredClass, character.classe, StringComparison.OrdinalIgnoreCase))
-                return (false, $"Classe incorreta (requer {template.requiredClass})");
-
-            if (character.learnedSkills?.Any(s => s.skillId == skillId) == true)
-                return (false, "Skill já aprendida");
-
-            return (true, "OK");
-        }
-
+        // ✅ MELHORADO: LearnSkill com validações de slot
         public bool LearnSkill(Player player, int skillId, int slotNumber)
         {
             var template = GetSkillTemplate(skillId);
@@ -599,6 +629,13 @@ namespace MMOServer.Server
             if (template == null)
             {
                 Console.WriteLine($"❌ Skill {skillId} not found");
+                return false;
+            }
+
+            // ✅ VALIDAÇÃO: Slot entre 1-9
+            if (slotNumber < 1 || slotNumber > 9)
+            {
+                Console.WriteLine($"❌ Invalid slot: {slotNumber}. Must be between 1-9");
                 return false;
             }
 
@@ -610,20 +647,15 @@ namespace MMOServer.Server
                 return false;
             }
 
-            if (slotNumber < 1 || slotNumber > 9)
-            {
-                Console.WriteLine($"❌ Invalid slot: {slotNumber}");
-                return false;
-            }
-
             // Inicializa lista se null
             player.character.learnedSkills ??= new List<LearnedSkill>();
 
-            // Remove skill anterior do slot
+            // ✅ VALIDAÇÃO: Avisa se vai sobrescrever skill no slot
             var oldSkillInSlot = player.character.learnedSkills.FirstOrDefault(s => s.slotNumber == slotNumber);
             if (oldSkillInSlot != null)
             {
-                oldSkillInSlot.slotNumber = 0;
+                Console.WriteLine($"⚠️ Slot {slotNumber} already has {GetSkillTemplate(oldSkillInSlot.skillId)?.name}. It will be unslotted.");
+                oldSkillInSlot.slotNumber = 0; // Remove do slot mas não deleta a skill
             }
 
             // Adiciona skill
@@ -647,8 +679,33 @@ namespace MMOServer.Server
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ Error saving learned skill: {ex.Message}");
+                // Rollback
+                player.character.learnedSkills.Remove(learnedSkill);
                 return false;
             }
+        }
+
+        public (bool canLearn, string reason) CanLearnSkill(Character character, int skillId)
+        {
+            var template = GetSkillTemplate(skillId);
+            
+            if (template == null)
+                return (false, "Skill não encontrada");
+
+            if (character.level < template.requiredLevel)
+                return (false, $"Nível insuficiente (requer {template.requiredLevel})");
+
+            if (!string.IsNullOrEmpty(template.requiredClass) && 
+                !string.Equals(template.requiredClass, character.classe, StringComparison.OrdinalIgnoreCase))
+                return (false, $"Classe incorreta (requer {template.requiredClass})");
+
+            // ✅ CORREÇÃO: Inicializa se null
+            character.learnedSkills ??= new List<LearnedSkill>();
+
+            if (character.learnedSkills.Any(s => s.skillId == skillId))
+                return (false, "Skill já aprendida");
+
+            return (true, "OK");
         }
 
         public bool LevelUpSkill(Player player, int skillId)
@@ -698,11 +755,12 @@ namespace MMOServer.Server
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ Error saving skill level up: {ex.Message}");
+                // Rollback
+                player.character.statusPoints += nextLevelData.statusPointCost;
+                learnedSkill.currentLevel--;
                 return false;
             }
         }
-
-        // ==================== HELPERS ====================
 
         private SkillLevelData? GetSkillLevelData(SkillTemplate template, int level)
         {
