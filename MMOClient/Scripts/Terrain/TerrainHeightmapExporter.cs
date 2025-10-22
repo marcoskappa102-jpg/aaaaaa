@@ -5,15 +5,6 @@ using System.IO;
 using UnityEditor;
 #endif
 
-/// <summary>
-/// Exporta o heightmap do terreno Unity para o servidor
-/// Coloque em: mmoclient/Assets/Editor/TerrainHeightmapExporter.cs
-/// 
-/// USO:
-/// 1. Menu Unity: MMO > Export Terrain Heightmap
-/// 2. Arquivo será salvo em MMOServer/Config/terrain_heightmap.json
-/// 3. Servidor carrega automaticamente ao iniciar
-/// </summary>
 public class TerrainHeightmapExporter : MonoBehaviour
 {
 #if UNITY_EDITOR
@@ -251,4 +242,5 @@ public class TerrainHeightmapExporter : MonoBehaviour
         Debug.Log($"✅ Heightmap validated:\n{info}");
     }
 #endif
+
 }
