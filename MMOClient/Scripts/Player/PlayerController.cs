@@ -1,0 +1,808 @@
+using UnityEngine;
+using Newtonsoft.Json;
+using TMPro;
+
+/// <summary>
+/// PlayerController - SISTEMA LINEAGE 2 CORRIGIDO
+/// 1º clique: Seleciona alvo (mostra painel)
+/// 2º clique: Inicia ataque automático
+/// Skills: Valida range, move até lá, usa skill
+/// </summary>
+public class PlayerController : MonoBehaviour
+{
+    [Header("Movement Settings")]
+    public float interpolationSpeed = 10f;
+    public float characterHeightOffset = 0f;
+	
+    [Header("Character Info")]
+    public string characterName;
+    public string playerId;
+    public bool isLocalPlayer;
+    
+    [Header("Combat")]
+    public int currentHealth;
+    public int maxHealth;
+    public int level = 1;
+    public bool isDead = false;
+    public bool inCombat = false;
+    
+    [Header("UI")]
+    public TextMeshProUGUI nameText;
+    public GameObject healthBarCanvas;
+    public UnityEngine.UI.Image healthBarFill;
+    public TextMeshProUGUI healthText;
+    public GameObject combatIcon;
+    
+    [Header("Billboard")]
+    public bool enableBillboard = true;
+    public Transform billboardTransform;
+
+    [Header("Visual Feedback")]
+    public GameObject attackEffectPrefab;
+    public Transform attackEffectPoint;
+
+    [Header("Animation")]
+    public Animator animator;
+    public float attackAnimationDuration = 1.0f;
+
+    private Vector3 serverPosition;
+    private Vector3 serverTargetPosition;
+    private bool serverIsMoving = false;
+    private bool serverInCombat = false;
+    private Vector3 displayPosition;
+    
+    private CharacterController characterController;
+    private MonsterController currentTarget;
+    private Camera mainCamera;
+
+    // ✅ SISTEMA DE CLIQUE CORRIGIDO
+    private float lastClickTime = 0f;
+    private const float DOUBLE_CLICK_TIME = 0.3f; // Tempo para double click (reduzido para ser mais responsivo)
+    private MonsterController lastClickedMonster;
+    
+    private int currentTargetMonsterId = -1;
+
+    private bool isAttacking = false;
+    private float lastAttackTime = 0f;
+
+    private bool wasDeadLastFrame = false;
+    private bool wasMovingLastFrame = false;
+    private bool wasInCombatLastFrame = false;
+
+    private void Awake()
+    {
+        characterController = GetComponent<CharacterController>();
+        if (characterController == null)
+        {
+            characterController = gameObject.AddComponent<CharacterController>();
+            characterController.center = new Vector3(0, 1, 0);
+            characterController.radius = 0.5f;
+            characterController.height = 2f;
+        }
+        
+        characterController.enabled = true;
+
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>();
+            if (animator == null)
+            {
+                Debug.LogWarning($"⚠️ PlayerController: No Animator found on {gameObject.name}!");
+            }
+        }
+    }
+
+    private void Start()
+    {
+        mainCamera = Camera.main;
+
+        serverPosition = transform.position;
+        displayPosition = transform.position;
+        
+        if (billboardTransform == null && healthBarCanvas != null)
+        {
+            billboardTransform = healthBarCanvas.transform;
+        }
+
+        if (healthBarCanvas != null)
+        {
+            var raycaster = healthBarCanvas.GetComponent<UnityEngine.UI.GraphicRaycaster>();
+            if (raycaster != null)
+                Destroy(raycaster);
+        }
+
+        if (attackEffectPoint == null)
+        {
+            var point = new GameObject("AttackEffectPoint");
+            point.transform.SetParent(transform);
+            point.transform.localPosition = Vector3.up * 1.5f;
+            attackEffectPoint = point.transform;
+        }
+        
+        if (MessageHandler.Instance != null)
+        {
+            MessageHandler.Instance.OnPlayerAttack += HandlePlayerAttackEvent;
+        }
+        
+        AdjustToTerrainHeight();
+        UpdateHealthBar();
+        
+        if (combatIcon != null)
+            combatIcon.SetActive(false);
+
+        InitializeAnimator();
+
+        Debug.Log($"✅ PlayerController Start: {characterName}");
+    }
+
+    private void Update()
+    {
+        if (isLocalPlayer && !isDead)
+        {
+            HandleInput();
+        }
+
+        InterpolateToServerPosition();
+        UpdateAnimations();
+        UpdateCombatVisual();
+        UpdateBillboard();
+        AdjustToTerrainHeight();
+    }
+	
+    private void HandlePlayerAttackEvent(PlayerAttackData data)
+    {
+        if (data.playerId == playerId)
+        {
+            PlayAttackAnimation();
+            
+            var monster = GameObject.Find($"Monster_{data.monsterName}_{data.monsterId}");
+            if (monster != null)
+            {
+                RotateTowards(monster.transform.position);
+            }
+        }
+    }
+
+    private void RotateTowards(Vector3 targetPosition)
+    {
+        Vector3 direction = targetPosition - transform.position;
+        direction.y = 0;
+        
+        if (direction.magnitude > 0.1f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            transform.rotation = targetRotation;
+        }
+    }
+
+    private void AdjustToTerrainHeight()
+    {
+        if (TerrainHelper.Instance != null)
+        {
+            Vector3 pos = transform.position;
+            pos.y = TerrainHelper.Instance.GetHeightAt(pos.x, pos.z) + characterHeightOffset;
+            transform.position = pos;
+        }
+        else
+        {
+            Vector3 pos = transform.position;
+            pos.y = characterHeightOffset;
+            transform.position = pos;
+        }
+    }
+
+private void HandleInput()
+{
+    if (Input.GetMouseButtonDown(0))
+    {
+        if (UIManager.IsPointerOverUI())
+            return;
+
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        RaycastHit hit;
+        int monsterLayer = LayerMask.GetMask("Monster");
+
+        // Tenta clicar em monstro
+        if (Physics.Raycast(ray, out hit, 2000f, monsterLayer))
+        {
+            var monster = hit.collider.GetComponent<MonsterController>();
+            
+            if (monster != null && monster.isAlive)
+            {
+                HandleMonsterClick(monster);
+                return;
+            }
+        }
+
+        // ✅ Só move se NÃO estiver usando skill
+        if (TerrainHelper.Instance != null && !IsMovingForSkill())
+        {
+            Vector3 hitPoint;
+            if (TerrainHelper.Instance.RaycastTerrain(ray, out hitPoint))
+            {
+                SendMoveRequestToServer(hitPoint);
+                ClearTarget();
+            }
+        }
+    }
+}
+/// <summary>
+/// ✅ Verifica se está se movendo para usar skill
+/// </summary>
+private bool IsMovingForSkill()
+{
+    return SkillManager.Instance != null && SkillManager.Instance.IsMovingToUseSkill();
+}
+
+
+    /// <summary>
+    /// ✅ CORRIGIDO - Sistema de clique em monstro
+    /// 1º clique: Seleciona (mostra painel mas NÃO some)
+    /// 2º clique rápido: Ataca
+    /// </summary>
+    private void HandleMonsterClick(MonsterController monster)
+    {
+        float timeSinceLastClick = Time.time - lastClickTime;
+        
+        // Mesmo monstro clicado rapidamente = double click
+        if (monster == lastClickedMonster && timeSinceLastClick < DOUBLE_CLICK_TIME)
+        {
+            // 2º CLIQUE - INICIA ATAQUE AUTOMÁTICO
+            Debug.Log($"⚔️ Double click! Starting auto-attack on {monster.monsterName}");
+            StartAutoAttack(monster);
+        }
+        else
+        {
+            // 1º CLIQUE - APENAS SELECIONA (NÃO SOME O PAINEL)
+            Debug.Log($"🎯 Selected target: {monster.monsterName}");
+            SelectTarget(monster);
+        }
+        
+        lastClickedMonster = monster;
+        lastClickTime = Time.time;
+    }
+
+    /// <summary>
+    /// ✅ CORRIGIDO - Apenas seleciona o alvo (não ataca, não some)
+    /// </summary>
+    private void SelectTarget(MonsterController monster)
+    {
+        currentTarget = monster;
+        currentTargetMonsterId = monster.monsterId;
+        
+        // Notifica SkillManager sobre target
+        if (SkillManager.Instance != null)
+        {
+            SkillManager.Instance.SetCurrentTarget(monster.monsterId);
+        }
+        
+        // ✅ MANTÉM o painel de target visível
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowTargetPanel(monster);
+        }
+        
+        Debug.Log($"🎯 Target selected: {monster.monsterName} (ID: {monster.monsterId}) - Panel stays visible");
+    }
+
+    /// <summary>
+    /// ✅ CORRIGIDO - Inicia ataque automático
+    /// </summary>
+    private void StartAutoAttack(MonsterController monster)
+    {
+        if (currentTarget != monster)
+        {
+            SelectTarget(monster);
+        }
+        
+        // Envia comando de ataque ao servidor
+        var message = new
+        {
+            type = "attackMonster",
+            monsterId = monster.monsterId
+        };
+
+        string json = JsonConvert.SerializeObject(message);
+        ClientManager.Instance.SendMessage(json);
+        
+        Debug.Log($"⚔️ Started auto-attack on {monster.monsterName} (ID: {monster.monsterId})");
+    }
+
+    /// <summary>
+    /// ✅ CORRIGIDO - Limpa target atual
+    /// </summary>
+    public void ClearTarget()
+    {
+        currentTargetMonsterId = -1;
+        currentTarget = null;
+        lastClickedMonster = null;
+        
+        if (SkillManager.Instance != null)
+        {
+            SkillManager.Instance.ClearCurrentTarget();
+        }
+        
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.HideTargetPanel();
+        }
+        
+        Debug.Log("🚫 Target cleared");
+    }
+
+    private void SendMoveRequestToServer(Vector3 targetPosition)
+    {
+        if (TerrainHelper.Instance != null)
+        {
+            targetPosition = TerrainHelper.Instance.ClampToGround(targetPosition, characterHeightOffset);
+        }
+
+        var message = new
+        {
+            type = "moveRequest",
+            targetPosition = new
+            {
+                x = targetPosition.x,
+                y = targetPosition.y,
+                z = targetPosition.z
+            }
+        };
+
+        string json = JsonConvert.SerializeObject(message);
+        ClientManager.Instance.SendMessage(json);
+    }
+
+    private void UpdateBillboard()
+    {
+        if (!enableBillboard || billboardTransform == null || mainCamera == null)
+            return;
+
+        billboardTransform.LookAt(billboardTransform.position + mainCamera.transform.rotation * Vector3.forward,
+                                  mainCamera.transform.rotation * Vector3.up);
+    }
+
+    public void UpdateFromServer(Vector3 position, Vector3? targetPos, bool isMoving, int health, int maxHp, bool dead, bool combat)
+    {
+        if (TerrainHelper.Instance != null)
+        {
+            position = TerrainHelper.Instance.ClampToGround(position, characterHeightOffset);
+            
+            if (targetPos.HasValue)
+            {
+                Vector3 target = targetPos.Value;
+                target = TerrainHelper.Instance.ClampToGround(target, characterHeightOffset);
+                serverTargetPosition = target;
+            }
+        }
+        else
+        {
+            position.y = characterHeightOffset;
+            if (targetPos.HasValue)
+            {
+                Vector3 target = targetPos.Value;
+                target.y = characterHeightOffset;
+                serverTargetPosition = target;
+            }
+        }
+        
+        serverPosition = position;
+        serverIsMoving = isMoving;
+        serverInCombat = combat;
+        currentHealth = health;
+        maxHealth = maxHp;
+        isDead = dead;
+        inCombat = combat;
+        
+        // ✅ CORRIGIDO - Só limpa target se realmente saiu de combate
+        if (!combat && currentTargetMonsterId != -1)
+        {
+            // Verifica se o monstro morreu
+            if (currentTarget != null && !currentTarget.isAlive)
+            {
+                ClearTarget();
+            }
+        }
+
+        if (combat && targetPos.HasValue && currentTarget != null)
+        {
+            Vector3 directionToCombat = targetPos.Value - serverPosition;
+            directionToCombat.y = 0;
+            
+            if (directionToCombat.magnitude > 0.1f)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(directionToCombat);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 15f * Time.deltaTime);
+            }
+        }
+        
+        UpdateHealthBar();
+        
+        if (isLocalPlayer && currentTarget != null && UIManager.Instance != null)
+        {
+            UIManager.Instance.UpdateTargetHealth(currentTarget.currentHealth, currentTarget.maxHealth);
+        }
+    }
+
+    private void InterpolateToServerPosition()
+    {
+        float distance = Vector3.Distance(displayPosition, serverPosition);
+
+        if (distance > 5f)
+        {
+            displayPosition = serverPosition;
+            transform.position = displayPosition;
+            return;
+        }
+
+        displayPosition = Vector3.Lerp(displayPosition, serverPosition, interpolationSpeed * Time.deltaTime);
+
+        Vector3 movement = displayPosition - transform.position;
+        if (movement.magnitude > 0.001f)
+        {
+            if (characterController != null && characterController.enabled)
+            {
+                characterController.Move(movement);
+            }
+            else
+            {
+                transform.position = displayPosition;
+            }
+        }
+
+        if (serverIsMoving)
+        {
+            Vector3 direction = (serverTargetPosition - serverPosition);
+            direction.y = 0;
+            direction.Normalize();
+            
+            if (direction.magnitude > 0.1f)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(direction);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 10f * Time.deltaTime);
+            }
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (MessageHandler.Instance != null)
+        {
+            MessageHandler.Instance.OnPlayerAttack -= HandlePlayerAttackEvent;
+        }
+    }
+
+    private void InitializeAnimator()
+    {
+        if (animator == null)
+        {
+            Debug.LogWarning($"⚠️ {characterName}: Animator is null!");
+            return;
+        }
+
+        animator.SetBool("isWalking", false);
+        animator.SetBool("inCombat", false);
+        animator.SetBool("isDead", false);
+        
+        if (HasParameter(animator, "Attack"))
+        {
+            animator.ResetTrigger("Attack");
+        }
+
+        if (isDead)
+        {
+            animator.SetBool("isDead", true);
+        }
+
+        Debug.Log($"🎬 {characterName}: Animator initialized");
+    }
+
+    private void UpdateAnimations()
+    {
+        if (animator == null)
+            return;
+
+        if (isDead)
+        {
+            if (!wasDeadLastFrame)
+            {
+                Debug.Log($"💀 {characterName}: Setting death animation");
+                animator.SetBool("isDead", true);
+                animator.SetBool("isWalking", false);
+                animator.SetBool("inCombat", false);
+                
+                if (HasParameter(animator, "Attack"))
+                {
+                    animator.ResetTrigger("Attack");
+                }
+            }
+            
+            wasDeadLastFrame = true;
+            wasMovingLastFrame = false;
+            wasInCombatLastFrame = false;
+            return;
+        }
+
+        if (wasDeadLastFrame && !isDead)
+        {
+            Debug.Log($"✨ {characterName}: Respawned - Resetting animator");
+            
+            animator.SetBool("isDead", false);
+            animator.SetBool("isWalking", false);
+            animator.SetBool("inCombat", false);
+            
+            if (HasParameter(animator, "Attack"))
+            {
+                animator.ResetTrigger("Attack");
+            }
+
+            animator.Play("Idle", 0, 0f);
+            
+            wasDeadLastFrame = false;
+        }
+
+        bool shouldWalk = serverIsMoving && !isDead;
+        bool shouldCombat = serverInCombat && !isDead;
+
+        if (shouldWalk != wasMovingLastFrame)
+        {
+            animator.SetBool("isWalking", shouldWalk);
+            wasMovingLastFrame = shouldWalk;
+        }
+
+        if (shouldCombat != wasInCombatLastFrame)
+        {
+            animator.SetBool("inCombat", shouldCombat);
+            wasInCombatLastFrame = shouldCombat;
+        }
+
+        if (isAttacking && Time.time - lastAttackTime >= attackAnimationDuration)
+        {
+            isAttacking = false;
+        }
+    }
+
+    public void PlayAttackAnimation()
+    {
+        if (animator == null || isDead)
+            return;
+
+        if (HasParameter(animator, "Attack"))
+        {
+            animator.SetTrigger("Attack");
+            isAttacking = true;
+            lastAttackTime = Time.time;
+            
+            Debug.Log($"▶️ {characterName}: Playing attack animation");
+        }
+    }
+
+    private bool HasParameter(Animator anim, string paramName)
+    {
+        foreach (AnimatorControllerParameter param in anim.parameters)
+        {
+            if (param.name == paramName)
+                return true;
+        }
+        return false;
+    }
+
+    private void UpdateCombatVisual()
+    {
+        if (combatIcon != null)
+        {
+            combatIcon.SetActive(serverInCombat && !isDead);
+        }
+        
+        if (isLocalPlayer && UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowCombatStatus(serverInCombat && !isDead);
+        }
+    }
+
+    public void UpdateHealthBar()
+    {
+        if (healthBarFill != null)
+        {
+            float healthPercent = maxHealth > 0 ? (float)currentHealth / maxHealth : 0f;
+            healthBarFill.fillAmount = healthPercent;
+            
+            if (healthPercent > 0.5f)
+                healthBarFill.color = Color.green;
+            else if (healthPercent > 0.25f)
+                healthBarFill.color = Color.yellow;
+            else
+                healthBarFill.color = Color.red;
+        }
+
+        if (healthText != null)
+        {
+            healthText.text = $"{currentHealth}/{maxHealth}";
+        }
+
+        if (healthBarCanvas != null && !isLocalPlayer)
+        {
+            healthBarCanvas.SetActive(currentHealth < maxHealth || isDead);
+        }
+        
+        if (isLocalPlayer && UIManager.Instance != null)
+        {
+            UIManager.Instance.UpdateHealthBar(currentHealth, maxHealth);
+        }
+    }
+
+    public void ShowDamage(int damage, bool isCritical)
+    {
+        if (DamageTextManager.Instance != null)
+        {
+            DamageTextManager.Instance.ShowDamage(
+                transform.position + Vector3.up * 2f,
+                damage,
+                isCritical
+            );
+        }
+
+        if (attackEffectPrefab != null && attackEffectPoint != null)
+        {
+            var effect = Instantiate(attackEffectPrefab, attackEffectPoint.position, Quaternion.identity);
+            Destroy(effect, 1f);
+        }
+    }
+
+    public void Initialize(string id, string name, bool local, int hp, int maxHp, int lvl)
+    {
+        playerId = id;
+        characterName = name;
+        isLocalPlayer = local;
+        currentHealth = hp;
+        maxHealth = maxHp;
+        level = lvl;
+
+        if (nameText != null)
+        {
+            nameText.text = $"{characterName}\nLv.{level}";
+        }
+
+        if (isLocalPlayer)
+        {
+            gameObject.tag = "Player";
+            gameObject.layer = LayerMask.NameToLayer("Player");
+            
+            var collider = GetComponent<Collider>();
+            if (collider != null && !(collider is CharacterController))
+            {
+                collider.enabled = false;
+            }
+
+            if (characterController != null)
+            {
+                characterController.enabled = true;
+            }
+        }
+        else
+        {
+            gameObject.layer = LayerMask.NameToLayer("OtherPlayers");
+            
+            if (characterController != null)
+            {
+                characterController.enabled = false;
+            }
+        }
+        
+        AdjustToTerrainHeight();
+        UpdateHealthBar();
+        InitializeAnimator();
+    }
+
+    public void OnDeath()
+    {
+        Debug.Log($"💀 {characterName}: OnDeath called");
+        
+        isDead = true;
+        inCombat = false;
+        ClearTarget();
+        
+        if (animator != null)
+        {
+            Debug.Log($"💀 {characterName}: Setting death animation");
+            animator.SetBool("isDead", true);
+            animator.SetBool("inCombat", false);
+            animator.SetBool("isWalking", false);
+            
+            if (HasParameter(animator, "Attack"))
+            {
+                animator.ResetTrigger("Attack");
+            }
+        }
+
+        if (combatIcon != null)
+        {
+            combatIcon.SetActive(false);
+        }
+
+        if (isLocalPlayer)
+        {
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.ShowRespawnButton();
+                UIManager.Instance.HideTargetPanel();
+                UIManager.Instance.ShowCombatStatus(false);
+            }
+        }
+
+        wasDeadLastFrame = true;
+    }
+
+    public void OnRespawn(Vector3 position)
+    {
+        Debug.Log($"✨ {characterName}: OnRespawn called");
+        
+        isDead = false;
+        inCombat = false;
+        ClearTarget();
+        
+        if (TerrainHelper.Instance != null)
+        {
+            position = TerrainHelper.Instance.ClampToGround(position, characterHeightOffset);
+        }
+        else
+        {
+            position.y = characterHeightOffset;
+        }
+        
+        serverPosition = position;
+        displayPosition = position;
+        transform.position = position;
+        
+        if (animator != null)
+        {
+            Debug.Log($"✨ {characterName}: Resetting animator after respawn");
+            
+            animator.SetBool("isDead", false);
+            animator.SetBool("inCombat", false);
+            animator.SetBool("isWalking", false);
+            
+            if (HasParameter(animator, "Attack"))
+            {
+                animator.ResetTrigger("Attack");
+            }
+
+            animator.Play("Idle", 0, 0f);
+        }
+        
+        UpdateHealthBar();
+        
+        if (isLocalPlayer && UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowCombatStatus(false);
+            UIManager.Instance.HideDeathPanel();
+        }
+
+        wasDeadLastFrame = false;
+        wasMovingLastFrame = false;
+        wasInCombatLastFrame = false;
+    }
+
+    /// <summary>
+    /// ✅ PÚBLICO - Para SkillManager saber se tem target
+    /// </summary>
+    public bool HasTarget()
+    {
+        return currentTarget != null && currentTarget.isAlive;
+    }
+
+    /// <summary>
+    /// ✅ PÚBLICO - Retorna target atual
+    /// </summary>
+    public MonsterController GetCurrentTarget()
+    {
+        return currentTarget;
+    }
+
+    /// <summary>
+    /// ✅ PÚBLICO - Retorna ID do target
+    /// </summary>
+    public int GetCurrentTargetId()
+    {
+        return currentTargetMonsterId;
+    }
+}
