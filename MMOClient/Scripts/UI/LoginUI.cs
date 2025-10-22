@@ -4,9 +4,6 @@ using UnityEngine.SceneManagement;
 using TMPro;
 using Newtonsoft.Json;
 
-/// <summary>
-/// ✅ LoginUI CORRIGIDO - Remove warning CS0414
-/// </summary>
 public class LoginUI : MonoBehaviour
 {
     [Header("UI Elements")]
@@ -72,10 +69,6 @@ public class LoginUI : MonoBehaviour
             MessageHandler.Instance.OnRegisterResponse -= HandleRegisterResponse;
         }
     }
-
-    // ===================================
-    // CONTROLE DE CONEXÃO
-    // ===================================
 
     private void CheckConnectionStatus()
     {
@@ -152,11 +145,7 @@ public class LoginUI : MonoBehaviour
         if (registerButton != null) registerButton.interactable = true;
         if (confirmRegisterButton != null) confirmRegisterButton.interactable = true;
     }
-
-    // ===================================
-    // NAVEGAÇÃO DE PAINÉIS
-    // ===================================
-
+    
     private void ShowLoginPanel()
     {
         loginPanel.SetActive(true);
@@ -170,10 +159,6 @@ public class LoginUI : MonoBehaviour
         registerPanel.SetActive(true);
         statusText.text = "";
     }
-
-    // ===================================
-    // LOGIN
-    // ===================================
 
     private void OnLoginClick()
     {
@@ -230,10 +215,6 @@ public class LoginUI : MonoBehaviour
         if (loginButton != null)
             loginButton.interactable = true;
     }
-
-    // ===================================
-    // REGISTRO
-    // ===================================
 
     private void OnRegisterClick()
     {
@@ -299,10 +280,6 @@ public class LoginUI : MonoBehaviour
             confirmRegisterButton.interactable = true;
     }
 
-    // ===================================
-    // RESPOSTAS DO SERVIDOR
-    // ===================================
-
     private void HandleLoginResponse(LoginResponseData data)
     {
         loginButton.interactable = true;
@@ -349,4 +326,5 @@ public class LoginUI : MonoBehaviour
     {
         SceneManager.LoadScene("CharacterSelect");
     }
+
 }
