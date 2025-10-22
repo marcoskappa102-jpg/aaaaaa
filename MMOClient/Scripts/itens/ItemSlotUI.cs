@@ -34,9 +34,6 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHand
             highlightBorder.SetActive(false);
     }
 
-    /// <summary>
-    /// Define o item no slot
-    /// </summary>
     public void SetItem(ItemInstanceData item)
     {
         itemData = item;
@@ -74,10 +71,7 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHand
             highlightBorder.SetActive(true);
         }
     }
-
-    /// <summary>
-    /// Limpa o slot
-    /// </summary>
+    
     public void Clear()
     {
         itemData = null;
@@ -95,9 +89,6 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHand
         UpdateVisuals();
     }
 
-    /// <summary>
-    /// Carrega sprite do ícone (placeholder por enquanto)
-    /// </summary>
     private Sprite LoadIcon(string iconPath)
     {
         // TODO: Carregar de Resources ou AssetBundle
@@ -164,9 +155,6 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHand
         }
     }
 
-    /// <summary>
-    /// Ação rápida (usar/equipar com clique direito)
-    /// </summary>
     private void QuickAction()
     {
         if (itemData == null || itemData.template == null)
@@ -213,12 +201,10 @@ public class ItemSlotUI : MonoBehaviour, IPointerClickHandler, IPointerEnterHand
         }
     }
 
-    /// <summary>
-    /// Deseleciona o slot
-    /// </summary>
     public void Deselect()
     {
         isSelected = false;
         UpdateVisuals();
     }
+
 }
