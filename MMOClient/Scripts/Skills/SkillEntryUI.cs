@@ -4,22 +4,6 @@ using UnityEngine.EventSystems;
 using TMPro;
 using System;
 
-/// <summary>
-/// Script para cada entrada de skill no SkillBook
-/// Coloque em: MMOClient/Scripts/UI/Skills/SkillEntryUI.cs
-/// 
-/// COMO USAR:
-/// 1. Crie um prefab com este layout:
-///    - Image (background)
-///    - Image (icon)
-///    - TextMeshProUGUI (nameText)
-///    - TextMeshProUGUI (levelText)
-///    - TextMeshProUGUI (slotText) - opcional
-///    - Button (componente)
-/// 2. Adicione este script no prefab
-/// 3. Arraste os componentes nos campos públicos
-/// 4. Atribua o prefab no SkillBookUI
-/// </summary>
 public class SkillEntryUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("UI Elements")]
@@ -59,10 +43,6 @@ public class SkillEntryUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
             button.onClick.AddListener(OnButtonClick);
         }
     }
-
-    /// <summary>
-    /// Configura entry para skill aprendida
-    /// </summary>
     public void SetLearnedSkill(LearnedSkillData skill)
     {
         learnedSkill = skill;
@@ -103,10 +83,6 @@ public class SkillEntryUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
         if (backgroundImage != null)
             backgroundImage.color = normalColor;
     }
-
-    /// <summary>
-    /// Configura entry para skill disponível (ainda não aprendida)
-    /// </summary>
     public void SetAvailableSkill(SkillTemplateData skill, bool canLearn)
     {
         availableSkill = skill;
@@ -226,4 +202,5 @@ public class SkillEntryUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
     public SkillTemplateData GetAvailableSkill() => availableSkill;
     public bool IsLearned() => isLearned;
     public bool CanLearn() => canLearn;
+
 }
